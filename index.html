@@ -1,0 +1,1922 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Response Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+          darkMode: 'class',
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 250px;
+            background-color: #111827; /* bg-gray-900 */
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 50; /* Ensure tooltip is on top */
+            bottom: 125%;
+            left: 50%;
+            margin-left: -125px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 12px;
+            line-height: 1.4;
+            border: 1px solid #374151; /* border-gray-700 */
+        }
+        .tooltip .tooltiptext::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #111827 transparent transparent transparent;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        .question-level-1 { margin-left: 0; }
+        .question-level-2 { margin-left: 1.5rem; }
+        .question-level-3 { margin-left: 3rem; }
+        select[multiple] {
+            height: 8rem; /* Give multi-selects a visible height */
+        }
+        .details-summary::-webkit-details-marker {
+            display:none;
+        }
+        details[open] > summary .chevron {
+            transform: rotate(90deg);
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.7);
+        }
+        .modal-content {
+            background-color: #1f2937; /* bg-gray-800 */
+            margin: 5% auto;
+            padding: 24px;
+            border: 1px solid #374151; /* border-gray-700 */
+            width: 90%;
+            max-width: 500px;
+            border-radius: 8px;
+        }
+        #question-modal .modal-content, #exam-builder-modal .modal-content {
+            max-width: 900px; /* Wider modal for question setup */
+        }
+        #question-modal details > summary, #exam-builder-modal details > summary {
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        #question-modal details > summary::-webkit-details-marker, #exam-builder-modal details > summary::-webkit-details-marker {
+            display: none;
+        }
+        #question-modal summary .chevron, #exam-builder-modal summary .chevron {
+             transition: transform 0.2s;
+        }
+        #question-modal details[open] > summary .chevron, #exam-builder-modal details[open] > summary .chevron {
+            transform: rotate(90deg);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-white">Advanced Exam Response Tracker</h1>
+            <p class="mt-2 text-md text-gray-400">Define complex question structures and map them to educational outcomes.</p>
+        </header>
+
+        <main>
+            <!-- Session Management -->
+            <div class="bg-gray-800 border border-gray-700 p-4 rounded-lg shadow-md mb-8">
+                <h2 class="text-xl font-semibold mb-3 text-white">Session Management</h2>
+                <div class="flex flex-wrap gap-2">
+                    <button id="save-snapshot-btn" class="px-3 py-1.5 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700" title="Save a manual backup of your current state">Save Snapshot</button>
+                    <button id="load-snapshot-btn" class="px-3 py-1.5 text-sm font-medium rounded-md text-white bg-blue-500 hover:bg-blue-600" title="Load a previously saved manual backup">Load Snapshot</button>
+                    <button id="export-json-btn" class="px-3 py-1.5 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">Export as File</button>
+                    <label class="px-3 py-1.5 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 cursor-pointer">
+                        Import from File <input type="file" id="import-json-input" class="hidden" accept=".json">
+                    </label>
+                    <button id="reset-session-btn" class="px-3 py-1.5 text-sm font-medium rounded-md text-white bg-red-800 hover:bg-red-700" title="Clear all data and start a new exam">Reset All Data</button>
+                </div>
+            </div>
+
+            <!-- Setup Section -->
+            <div id="setup-section" class="bg-gray-800 border border-gray-700 p-6 rounded-lg shadow-md mb-8">
+                <div class="flex flex-wrap justify-between items-center mb-4 border-b border-gray-600 pb-3 gap-2">
+                    <h2 class="text-2xl font-semibold text-white">1. Exam Structure Setup</h2>
+                </div>
+                
+                <div class="mb-6">
+                    <label for="syllabus-select" class="block text-sm font-medium text-gray-300">Pre-populate Topics (NSW Science Syllabus)</label>
+                    <select id="syllabus-select" class="mt-1 block w-full pl-3 pr-10 py-2 text-base bg-gray-700 border-gray-600 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md text-white">
+                        <option value="" disabled selected>Select a Syllabus...</option>
+                        <option value="chemistry">Chemistry</option>
+                        <option value="biology">Biology</option>
+                        <option value="physics">Physics</option>
+                        <option value="investigating">Investigating Science</option>
+                        <option value="ees">Earth & Environmental Science</option>
+                    </select>
+                </div>
+                
+                <div id="exam-structure-container" class="space-y-2 min-h-[100px]">
+                    <!-- Dynamic question structure will be built here -->
+                </div>
+                <div class="mt-6 pt-6 border-t border-gray-700 space-y-6">
+                     <button id="exam-builder-btn" class="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                          Build Exam Structure
+                     </button>
+                     <div class="flex flex-wrap justify-between items-center gap-4">
+                          <div>
+                               <button id="save-template-btn" class="inline-flex items-center px-3 py-1.5 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">Save as Template</button>
+                               <button id="load-template-btn" class="inline-flex items-center px-3 py-1.5 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">Load Template</button>
+                          </div>
+                         <button id="finalize-setup-btn" class="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                              Finalise and Proceed
+                         </button>
+                     </div>
+                </div>
+            </div>
+
+            <!-- Data Entry and Analysis Section -->
+            <div id="data-section" class="hidden">
+                <!-- REDESIGNED Data Entry Section -->
+                <div id="results-container" class="bg-gray-800 border border-gray-700 p-6 rounded-lg shadow-md mb-8">
+                     <div class="flex justify-between items-center mb-4 border-b border-gray-600 pb-3">
+                          <h2 class="text-2xl font-semibold text-white">2. Enter Student Results</h2>
+                         <div class="flex items-center gap-4">
+                               <button id="edit-setup-btn" class="inline-flex items-center px-3 py-1.5 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Edit Setup</button>
+                               <button id="export-csv-btn" class="inline-flex items-center px-3 py-1.5 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Export as CSV</button>
+                         </div>
+                     </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                        <!-- Student List Column -->
+                        <div id="student-list-container" class="lg:col-span-1 bg-gray-900/50 p-4 rounded-lg h-fit">
+                            <!-- Student list will be rendered here by JS -->
+                        </div>
+
+                        <!-- Data Entry Form Column -->
+                        <div id="student-form-container" class="lg:col-span-3">
+                            <!-- Student form will be rendered here by JS -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Analysis Section -->
+                <div id="analysis-section" class="bg-gray-800 border border-gray-700 p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center border-b border-gray-600 pb-3 mb-4">
+                        <h2 class="text-2xl font-semibold text-white">3. Performance Analysis</h2>
+                        <button id="generate-pdf-report-btn" class="px-3 py-1.5 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">Generate PDF Report</button>
+                    </div>
+
+                    <div id="analysis-content">
+                         <p class="text-center text-gray-500 py-8">Analysis will appear here once you add students and enter their results.</p>
+                    </div>
+                    
+                    <div id="individual-analysis-container" class="mt-8 pt-6 border-t border-gray-700 hidden">
+                        <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+                            <h3 class="text-xl font-semibold text-white">Individual Student Analysis</h3>
+                            <button id="generate-individual-pdf-report-btn" class="hidden px-3 py-1.5 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Generate PDF for this Student</button>
+                        </div>
+                        <select id="student-select-for-analysis" class="block w-full max-w-xs pl-3 pr-10 py-2 text-base bg-gray-700 border-gray-600 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md text-white">
+                            <option value="">Select a student...</option>
+                        </select>
+                        <div id="individual-analysis-content" class="mt-4">
+                             <p class="text-center text-gray-500 py-8">Select a student to see their detailed analysis.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Template Modal -->
+    <div id="template-modal" class="modal">
+      <div class="modal-content">
+        <h3 class="text-xl font-semibold text-white mb-4">Manage Templates</h3>
+        <div id="template-list" class="space-y-2"></div>
+        <div class="mt-4 flex justify-end gap-2">
+            <input type="text" id="new-template-name" placeholder="New template name..." class="block w-full rounded-md bg-gray-600 border-gray-500 p-2 text-white">
+            <button id="save-new-template-btn" class="px-3 py-1.5 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Save New</button>
+            <button onclick="document.getElementById('template-modal').style.display='none'" class="px-3 py-1.5 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Question Editor Modal -->
+    <div id="question-modal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="modal-title" class="text-xl font-semibold text-white">Edit Question</h3>
+            </div>
+            <div id="question-form-content" class="space-y-4">
+                <!-- Form content will be injected here by JS -->
+            </div>
+            <div class="mt-6 flex justify-end gap-3">
+                <button id="cancel-question-modal-btn" class="px-4 py-2 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">Cancel</button>
+                <button id="save-and-edit-next-btn" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-500 hover:bg-blue-600">Save & Continue to Next Question</button>
+                <button id="save-question-modal-btn" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Save & Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Exam Builder Modal -->
+    <div id="exam-builder-modal" class="modal">
+        <div class="modal-content">
+             <h3 class="text-2xl font-semibold text-white mb-4 border-b border-gray-600 pb-2">Exam Builder</h3>
+             <div id="exam-builder-content" class="space-y-4 max-h-[60vh] overflow-y-auto p-2">
+                 <!-- Exam builder content will be generated here -->
+             </div>
+             <div class="mt-6 flex justify-end gap-3">
+                 <button id="cancel-exam-builder-btn" class="px-4 py-2 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">Cancel</button>
+                 <button id="build-exam-btn" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">Build Exam Scaffold</button>
+             </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- SYLLABUS DATA ---
+        const wsOutcomes = {
+            yr11: ["11-1", "11-2", "11-3", "11-4", "11-5", "11-6", "11-7"],
+            yr12: ["12-1", "12-2", "12-3", "12-4", "12-5", "12-6", "12-7"],
+        };
+        const syllabusData = {
+            chemistry: {
+                prefix: "CH",
+                modules: [
+                    { name: 'Mod 1: Properties and Structure of Matter', contentAreas: ['Properties of Matter', 'Atomic structure and atomic mass', 'Periodicity', 'Bonding'], outcomes: ['11-8'] },
+                    { name: 'Mod 2: Introduction to Quantitative Chemistry', contentAreas: ['Mole Concept', 'Concentration and Molarity', 'Gas Laws'], outcomes: ['11-9'] },
+                    { name: 'Mod 3: Reactive Chemistry', contentAreas: ['Predicting Reactions of Metals', 'Rates of Reactions'], outcomes: ['11-10'] },
+                    { name: 'Mod 4: Drivers of Reactions', contentAreas: ['Energy Changes in Chemical Reactions', 'Enthalpy and Hess’s Law', 'Entropy and Gibbs Free Energy'], outcomes: ['11-11'] },
+                    { name: 'Mod 5: Equilibrium and Acid Reactions', contentAreas: ['Static and Dynamic Equilibrium', 'Factors Affecting Equilibrium', 'Calculating the Equilibrium Constant'], outcomes: ['12-12'] },
+                    { name: 'Mod 6: Acid/base Reactions', contentAreas: ['Properties of Acids and Bases', 'Using Brønsted-Lowry Theory', 'Quantitative Analysis'], outcomes: ['12-13'] },
+                    { name: 'Mod 7: Organic Chemistry', contentAreas: ['Nomenclature', 'Hydrocarbons', 'Alcohols', 'Reactions of Organic Compounds', 'Polymers'], outcomes: ['12-14'] },
+                    { name: 'Mod 8: Applying Chemical Ideas', contentAreas: ['Analysis of Inorganic Substances', 'Analysis of Organic Substances', 'Chemical Synthesis and Design'], outcomes: ['12-15'] }
+                ]
+            },
+            biology: {
+                prefix: "BIO",
+                modules: [
+                    { name: 'Mod 1: Cells as the Basis of Life', contentAreas: ['Cell structure', 'Cell function'], outcomes: ['11-8'] },
+                    { name: 'Mod 2: Organisation of Living Things', contentAreas: ['Organisation of cells', 'Nutrient and gas requirements', 'Transport'], outcomes: ['11-9'] },
+                    { name: 'Mod 3: Biological Diversity', contentAreas: ['Effects of the environment on organisms', 'Adaptations', 'Theory of Evolution by Natural Selection'], outcomes: ['11-10'] },
+                    { name: 'Mod 4: Ecosystem Dynamics', contentAreas: ['Population dynamics', 'Past ecosystems', 'Future ecosystems'], outcomes: ['11-11'] },
+                    { name: 'Mod 5: Heredity', contentAreas: ['Reproduction', 'Cell Replication', 'DNA and Polypeptide Synthesis', 'Genetic Variation'], outcomes: ['12-12'] },
+                    { name: 'Mod 6: Genetic Change', contentAreas: ['Mutation', 'Biotechnology', 'Genetic Technologies'], outcomes: ['12-13'] },
+                    { name: 'Mod 7: Infectious Disease', contentAreas: ['Causes of Infectious Disease', 'Responses to Pathogens', 'Immunity', 'Prevention, Treatment and Control'], outcomes: ['12-14'] },
+                    { name: 'Mod 8: Non-infectious Disease and Disorders', contentAreas: ['Homeostasis', 'Causes and Effects', 'Epidemiology', 'Prevention', 'Technologies and Disorders'], outcomes: ['12-15'] }
+                ]
+            },
+            physics: {
+                prefix: "PHY",
+                modules: [
+                    { name: 'Mod 1: Kinematics', contentAreas: ['Motion in a Straight Line', 'Motion on a Plane'], outcomes: ['11-8'] },
+                    { name: 'Mod 2: Dynamics', contentAreas: ['Forces', 'Force and Motion', 'Momentum, Energy and Simple Systems'], outcomes: ['11-9'] },
+                    { name: 'Mod 3: Waves and Thermodynamics', contentAreas: ['Wave Properties', 'Wave Behaviour', 'Sound Waves', 'Thermodynamics'], outcomes: ['11-10'] },
+                    { name: 'Mod 4: Electricity and Magnetism', contentAreas: ['Electrostatics', 'Electric Circuits', 'Magnetism'], outcomes: ['11-11'] },
+                    { name: 'Mod 5: Advanced Mechanics', contentAreas: ['Projectile Motion', 'Circular Motion', 'Motion in Gravitational Fields'], outcomes: ['12-12'] },
+                    { name: 'Mod 6: Electromagnetism', contentAreas: ['Charged Particles in Electric and Magnetic Fields', 'The Motor Effect', 'Electromagnetic Induction', 'Applications of the Motor Effect'], outcomes: ['12-13'] },
+                    { name: 'Mod 7: The Nature of Light', contentAreas: ['Electromagnetic Spectrum', 'Light: Wave Model', 'Light: Quantum Model', 'Light and Special Relativity'], outcomes: ['12-14'] },
+                    { name: 'Mod 8: From the Universe to the Atom', contentAreas: ['Origins of the Elements', 'Structure of the Atom', 'Quantum Mechanical Nature of the Atom', 'Properties of the Nucleus', 'Deep Inside the Atom'], outcomes: ['12-15'] }
+                ]
+            },
+            investigating: {
+                prefix: "INS",
+                modules: [
+                    { name: 'Mod 1: Cause and Effect – Observing', contentAreas: ['Observations', 'Inferences and Generalisations'], outcomes: ['11-8'] },
+                    { name: 'Mod 2: Cause and Effect – Inferences and Generalisations', contentAreas: ['Collecting and Recording Data', 'Analysing Data'], outcomes: ['11-9'] },
+                    { name: 'Mod 3: Scientific Models', contentAreas: ['Developing Models', 'Using Models'], outcomes: ['11-10'] },
+                    { name: 'Mod 4: Theories and Laws', contentAreas: ['Developing Theories and Laws', 'Using Theories and Laws'], outcomes: ['11-11'] },
+                    { name: 'Mod 5: Scientific Investigations', contentAreas: ['Planning Investigations', 'Conducting Investigations'], outcomes: ['12-12'] },
+                    { name: 'Mod 6: Technologies', contentAreas: ['Development of Technologies', 'Application of Technologies'], outcomes: ['12-13'] },
+                    { name: 'Mod 7: Fact or Fallacy?', contentAreas: ['Evaluating Claims', 'Evidence-based Arguments'], outcomes: ['12-14'] },
+                    { name: 'Mod 8: Science and Society', contentAreas: ['Science and Decision-making', 'Influence of Science'], outcomes: ['12-15'] }
+                ]
+            },
+            ees: {
+                prefix: "EES",
+                modules: [
+                    { name: 'Mod 1: Earth’s Resources', contentAreas: ['Structure of the Earth', 'Elements, Compounds and Mixtures', 'Water Resources', 'Soil Resources', 'Energy Resources'], outcomes: ['11-8'] },
+                    { name: 'Mod 2: Plate Tectonics', contentAreas: ['Plate Tectonic Supercycle', 'Evidence for Plate Tectonics', 'Hazards'], outcomes: ['11-9'] },
+                    { name: 'Mod 3: Energy Transformations', contentAreas: ['Renewable and Non-renewable Resources', 'Radiometric Dating', 'Energy from the Atom'], outcomes: ['11-10'] },
+                    { name: 'Mod 4: Human Impacts', contentAreas: ['Causes of Environmental Change', 'Measuring Environmental Change', 'Responding to Environmental Change'], outcomes: ['11-11'] },
+                    { name: 'Mod 5: Earth’s Processes', contentAreas: ['Rock Cycle', 'Water Cycle', 'Carbon Cycle', 'Atmospheric Processes'], outcomes: ['12-12'] },
+                    { name: 'Mod 6: Hazards', contentAreas: ['Volcanic Eruptions', 'Earthquakes', 'Tsunamis', 'Cyclones', 'Bushfires'], outcomes: ['12-13'] },
+                    { name: 'Mod 7: Climate Science', contentAreas: ['Natural Climate Variation', 'Evidence for Climate Change', 'Models and Drivers of Climate Change', 'Impacts of Climate Change'], outcomes: ['12-14'] },
+                    { name: 'Mod 8: Resource Management', contentAreas: ['Water Management', 'Waste Management', 'Sustainable Resource Use'], outcomes: ['12-15'] }
+                ]
+            }
+        };
+        
+        // --- STATE MANAGEMENT ---
+        const getInitialState = () => ({
+            questions: [],
+            students: [],
+            deleteMode: false,
+            selectedSyllabus: '',
+            selectedStudentId: null,
+            editingQuestion: null,
+            examScaffold: [],
+        });
+        let state = getInitialState();
+        let chartInstances = {};
+
+        // --- DOM ELEMENTS ---
+        const setupSection = document.getElementById('setup-section');
+        const syllabusSelect = document.getElementById('syllabus-select');
+        const dataSection = document.getElementById('data-section');
+        const examStructureContainer = document.getElementById('exam-structure-container');
+        const finalizeSetupBtn = document.getElementById('finalize-setup-btn');
+        
+        const resultsContainer = document.getElementById('results-container');
+        const studentListContainer = document.getElementById('student-list-container');
+        const studentFormContainer = document.getElementById('student-form-container');
+
+        const analysisContent = document.getElementById('analysis-content');
+        const exportCsvBtn = document.getElementById('export-csv-btn');
+        const editSetupBtn = document.getElementById('edit-setup-btn');
+        
+        const individualAnalysisContainer = document.getElementById('individual-analysis-container');
+        const studentSelectForAnalysis = document.getElementById('student-select-for-analysis');
+        const individualAnalysisContent = document.getElementById('individual-analysis-content');
+        
+        const saveSnapshotBtn = document.getElementById('save-snapshot-btn');
+        const loadSnapshotBtn = document.getElementById('load-snapshot-btn');
+        const exportJsonBtn = document.getElementById('export-json-btn');
+        const importJsonInput = document.getElementById('import-json-input');
+        const resetSessionBtn = document.getElementById('reset-session-btn');
+
+        const saveTemplateBtn = document.getElementById('save-template-btn');
+        const loadTemplateBtn = document.getElementById('load-template-btn');
+        const templateModal = document.getElementById('template-modal');
+        const templateList = document.getElementById('template-list');
+        const newTemplateNameInput = document.getElementById('new-template-name');
+        const saveNewTemplateBtn = document.getElementById('save-new-template-btn');
+        const generatePdfReportBtn = document.getElementById('generate-pdf-report-btn');
+        
+        // Question Modal Elements
+        const questionModal = document.getElementById('question-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const questionFormContent = document.getElementById('question-form-content');
+        const saveQuestionModalBtn = document.getElementById('save-question-modal-btn');
+        const saveAndEditNextBtn = document.getElementById('save-and-edit-next-btn');
+        const cancelQuestionModalBtn = document.getElementById('cancel-question-modal-btn');
+        
+        // Exam Builder Modal Elements
+        const examBuilderBtn = document.getElementById('exam-builder-btn');
+        const examBuilderModal = document.getElementById('exam-builder-modal');
+        const examBuilderContent = document.getElementById('exam-builder-content');
+        const buildExamBtn = document.getElementById('build-exam-btn');
+        const cancelExamBuilderBtn = document.getElementById('cancel-exam-builder-btn');
+
+
+        // --- AUTO-SAVE & SESSION LOGIC ---
+        let debounceTimer;
+        const debouncedAutoSave = () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                try {
+                    localStorage.setItem('examTrackerAutoSession', JSON.stringify(state));
+                } catch (e) {
+                    console.error('Auto-save failed:', e);
+                }
+            }, 1000); // Save 1 second after the last change
+        };
+
+        function autoLoadState() {
+            const savedState = localStorage.getItem('examTrackerAutoSession');
+            if (savedState) {
+                try {
+                    const parsedState = JSON.parse(savedState);
+                    state = parsedState;
+                    if (state.questions.length > 0 && !state.students.length) {
+                        setupSection.classList.remove('hidden');
+                        dataSection.classList.add('hidden');
+                    } else if (state.questions.length > 0) {
+                        setupSection.classList.add('hidden');
+                        dataSection.classList.remove('hidden');
+                    }
+                } catch (e) {
+                    console.error("Could not parse auto-saved session:", e);
+                    state = getInitialState();
+                }
+            }
+        }
+
+
+        // --- UTILITY FUNCTIONS ---
+        const createStudentObject = () => ({ id: crypto.randomUUID(), lastName: '', firstName: '', responses: {} });
+
+        const createQuestionObject = (number = '', parent = null) => ({
+            id: crypto.randomUUID(), number, maxMarks: 1,
+            module: [], 
+            contentArea: [], 
+            outcome: [], 
+            cognitiveVerb: [],
+            notes: '',
+            locked: false,
+            subQuestions: []
+        });
+        
+        const getLeafQuestions = (questions, parentNumber = '', level = 1) => {
+            let leaves = [];
+            questions.forEach((q) => {
+                const currentNumber = parentNumber ? `${parentNumber}(${q.number})` : `Q${q.number}`;
+                if (q.subQuestions.length === 0) {
+                    leaves.push({...q, displayNumber: currentNumber, level: level });
+                } else {
+                    leaves = leaves.concat(getLeafQuestions(q.subQuestions, currentNumber, level + 1));
+                }
+            });
+            return leaves;
+        };
+
+        const getAllQuestionsFlat = (questions = state.questions) => {
+            let flatList = [];
+            questions.forEach(q => {
+                flatList.push(q);
+                if (q.subQuestions && q.subQuestions.length > 0) {
+                    flatList = flatList.concat(getAllQuestionsFlat(q.subQuestions));
+                }
+            });
+            return flatList;
+        };
+
+
+        const findQuestionAndParent = (id, questions = state.questions, parent = null) => {
+            for (const question of questions) {
+                if (question.id === id) return { question, parent };
+                const found = findQuestionAndParent(id, question.subQuestions, question);
+                if (found) return found;
+            }
+            return null;
+        };
+        
+        const findQuestionById = (id) => findQuestionAndParent(id)?.question;
+
+        const getQuestionPath = (id, questions = state.questions, currentPath = []) => {
+            for (const q of questions) {
+                if (q.id === id) {
+                    return [...currentPath, q];
+                }
+                const path = getQuestionPath(id, q.subQuestions, [...currentPath, q]);
+                if (path) {
+                    return path;
+                }
+            }
+            return null;
+        };
+
+
+        const getColorForScore = (score, maxMarks) => {
+            if (score === null || score === undefined || maxMarks == 0) return 'bg-gray-700';
+            const percentage = (score / maxMarks) * 100;
+            if (percentage === 0) return 'bg-red-900/50';
+            if (percentage < 40) return 'bg-red-700/60';
+            if (percentage < 60) return 'bg-yellow-700/60';
+            if (percentage < 90) return 'bg-green-700/60';
+            if (percentage <= 100) return 'bg-green-600/70';
+            return 'bg-gray-700';
+        };
+
+        const toRomanNumeral = (num) => {
+            const numerals = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
+            return numerals[num - 1] || num.toString();
+        }
+
+        function checkSyllabusSelected() {
+            if (!state.selectedSyllabus) {
+                console.error("Please select a syllabus first.");
+                const syllabusSelectContainer = syllabusSelect.parentElement;
+                syllabusSelect.focus();
+                syllabusSelectContainer.classList.add('ring-2', 'ring-red-500', 'rounded-lg', 'transition', 'duration-300');
+                setTimeout(() => {
+                    syllabusSelectContainer.classList.remove('ring-2', 'ring-red-500');
+                }, 2000);
+                return false;
+            }
+            return true;
+        }
+
+        // --- SETUP LOGIC ---
+        const renderQuestionSetup = (questions = state.questions, container = examStructureContainer, level = 1) => {
+            container.innerHTML = '';
+            questions.forEach((q, index) => {
+                const questionWrapper = document.createElement('div');
+                questionWrapper.className = `question-level-${level} mt-2`;
+                questionWrapper.dataset.id = q.id;
+
+                const hasSubQuestions = q.subQuestions.length > 0;
+                const isMainQuestion = level === 1;
+                
+                const summaryHtml = `
+                    <div class="flex w-full items-center gap-3 bg-gray-700/50 p-2 rounded-md">
+                        <span class="font-semibold text-gray-300">${isMainQuestion ? `Q${q.number}` : `Part ${q.number}`}</span>
+                        <span class="flex-1 text-sm text-gray-400 truncate">${q.notes || ''}</span>
+                        ${hasSubQuestions ? `<span class="text-sm font-semibold text-gray-300 rounded-md bg-gray-600 px-2 py-1 parent-mark-total">Total: ${q.maxMarks}</span>` : `<span class="text-sm font-semibold text-gray-300 rounded-md bg-gray-600 px-2 py-1">Marks: ${q.maxMarks}</span>`}
+                        
+                        <!-- ACTION BUTTONS -->
+                        <div class="flex items-center space-x-1">
+                            <button class="edit-question-btn p-1.5 rounded-full hover:bg-gray-600 text-gray-300" title="Edit">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg>
+                            </button>
+                             ${level < 3 ? `<button class="add-sub-question-btn p-1.5 rounded-full hover:bg-gray-600 text-indigo-400" title="Add Sub-part">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8"/></svg>
+                            </button>` : ''}
+                            <button class="remove-question-btn p-1.5 rounded-full hover:bg-gray-600 text-red-400" title="Remove">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"/></svg>
+                            </button>
+                        </div>
+                    </div>`;
+
+                const bgColor = isMainQuestion ? (index % 2 === 0 ? 'bg-gray-800/50' : 'bg-gray-900/30') : '';
+
+                questionWrapper.innerHTML = `
+                    <div class="${bgColor} border border-gray-700 rounded-lg">
+                        ${summaryHtml}
+                        <div class="sub-questions-container ${level === 1 ? 'pl-4' : 'pl-2'}"></div>
+                    </div>`;
+
+                container.appendChild(questionWrapper);
+                if (hasSubQuestions) {
+                    renderQuestionSetup(q.subQuestions, questionWrapper.querySelector('.sub-questions-container'), level + 1);
+                }
+            });
+        };
+        
+        examStructureContainer.addEventListener('click', e => {
+            const button = e.target.closest('button');
+            if (!button) return;
+
+            const questionWrapper = button.closest('[data-id]');
+            const questionId = questionWrapper?.dataset.id;
+
+            if (button.matches('.edit-question-btn')) {
+                if (!checkSyllabusSelected()) return;
+                openQuestionModal(questionId);
+            } else if (button.matches('.add-sub-question-btn')) {
+                if (!checkSyllabusSelected()) return;
+                openQuestionModal(null, questionId); // New sub-question, parentId is current questionId
+            } else if (button.matches('.remove-question-btn')) {
+                const isMain = !findQuestionAndParent(questionId).parent;
+                const remove = (id, qs) => qs.filter(q => {
+                    if (q.id === id) return false;
+                    q.subQuestions = remove(id, q.subQuestions);
+                    return true;
+                });
+                state.questions = remove(questionId, state.questions);
+                if (isMain) { state.questions.forEach((q, i) => { q.number = (i + 1).toString(); }); }
+                updateParentQuestionData(true);
+            }
+        });
+        
+        function openQuestionModal(questionId = null, parentId = null) {
+            let question, isNew;
+
+            if (questionId) { // Editing existing question
+                question = findQuestionById(questionId);
+                isNew = false;
+            } else { // Adding new question
+                const parent = parentId ? findQuestionById(parentId) : null;
+                let newNumber;
+                if (parent) {
+                    const parentLevel = findQuestionAndParent(parent.id).parent ? 2 : 1;
+                    const nextIndex = parent.subQuestions.length;
+                    if (parentLevel === 1) {
+                         newNumber = String.fromCharCode(97 + nextIndex); // a, b, c...
+                    } else {
+                         newNumber = toRomanNumeral(nextIndex + 1); // i, ii, iii...
+                    }
+                } else {
+                    newNumber = (state.questions.length + 1).toString();
+                }
+                question = createQuestionObject(newNumber);
+                isNew = true;
+            }
+
+            state.editingQuestion = {
+                topLevelQuestion: JSON.parse(JSON.stringify(question)), // The entire object tree being edited
+                isNew,
+                originalParentId: parentId, // The parent in the main state.questions array
+                originalQuestionId: questionId // The original ID if editing
+            };
+            
+            renderModalForm();
+            questionModal.style.display = 'block';
+        }
+
+        function getFocusedQuestionInModal() {
+            if (!state.editingQuestion) return null;
+            return state.editingQuestion.topLevelQuestion;
+        }
+
+        function renderModalForm() {
+            const question = getFocusedQuestionInModal();
+            if (!question) return;
+
+            const parentInfo = state.editingQuestion.originalQuestionId ? findQuestionAndParent(state.editingQuestion.originalQuestionId) : { parent: null };
+            const isMainQuestionInState = !parentInfo.parent;
+
+            let fullTitle = "Editing ";
+            let path = [];
+            const { originalQuestionId, originalParentId, isNew, topLevelQuestion } = state.editingQuestion;
+
+            if (isNew) {
+                if (originalParentId) { // Adding a new sub-question
+                    path = getQuestionPath(originalParentId);
+                    path.push(topLevelQuestion); // Add the new (unsaved) question to the path
+                } else { // Adding a new top-level question
+                    path = [topLevelQuestion];
+                }
+            } else { // Editing an existing question
+                path = getQuestionPath(originalQuestionId);
+            }
+            
+            if (path && path.length > 0) {
+                fullTitle += `Question ${path[0].number}`;
+                for (let i = 1; i < path.length; i++) {
+                    fullTitle += `(${path[i].number})`;
+                }
+            } else {
+                 fullTitle = `Editing Question`; // Fallback
+            }
+
+            modalTitle.textContent = fullTitle;
+            if (modalBreadcrumb) modalBreadcrumb.innerHTML = ''; // Clear breadcrumb
+
+            const cognitiveVerbCheckboxes = ['Analyse', 'Calculate', 'Describe', 'Discuss', 'Evaluate', 'Explain', 'Identify', 'Justify', 'Outline', 'Predict']
+                .map(v => createCheckbox(v, question.cognitiveVerb.includes(v))).join('');
+
+            let moduleCheckboxes = '<p class="text-sm text-gray-500">No syllabus selected.</p>';
+            let contentAreaCheckboxes = '<p class="text-sm text-gray-500">Select module(s) to see options.</p>';
+            let outcomeCheckboxes = '<p class="text-sm text-gray-500">Select module(s) to see options.</p>';
+            const syllabus = state.selectedSyllabus ? syllabusData[state.selectedSyllabus] : null;
+            if (syllabus) {
+                moduleCheckboxes = syllabus.modules.map(m => createCheckbox(m.name, question.module.includes(m.name))).join('');
+                
+                const selectedModules = syllabus.modules.filter(m => question.module.includes(m.name));
+                if(selectedModules.length > 0) {
+                    const allContentAreas = [...new Set(selectedModules.flatMap(m => m.contentAreas))];
+                    contentAreaCheckboxes = allContentAreas.map(c => createCheckbox(c, question.contentArea.includes(c))).join('');
+                    
+                    const allOutcomes = new Map();
+                     selectedModules.forEach(m => {
+                          const isYr11 = parseInt(m.outcomes[0].split('-')[0], 10) === 11;
+                          const relevantWsOutcomes = isYr11 ? wsOutcomes.yr11 : wsOutcomes.yr12;
+                          [...relevantWsOutcomes, ...m.outcomes].forEach(o => {
+                               const fullCode = `${syllabus.prefix}${o}`;
+                               allOutcomes.set(fullCode, fullCode);
+                          });
+                     });
+                    outcomeCheckboxes = Array.from(allOutcomes.keys()).sort().map(fullCode => createCheckbox(fullCode, question.outcome.includes(fullCode))).join('');
+                }
+            }
+
+            const createAccordionSection = (title, content, fieldName) => `
+                <details class="bg-gray-800 border border-gray-700 rounded-lg" data-accordion-group="syllabus">
+                    <summary class="p-3 cursor-pointer font-medium text-gray-300">
+                        <span class="chevron w-5 h-5 text-gray-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
+                        </span>
+                        <span>${title}</span>
+                    </summary>
+                    <div class="p-3 border-t border-gray-700">
+                        <div class="w-full mt-1 rounded-md p-2 h-32 overflow-y-auto" data-field="${fieldName}">${content}</div>
+                    </div>
+                </details>
+            `;
+
+            const syllabusDetailsSection = question.subQuestions.length > 0 ? 
+                `<div class="text-center p-4 bg-gray-800 rounded-md text-gray-400 text-sm">Syllabus details for this question are managed by its sub-questions.</div>`
+                :
+                `<div class="space-y-2">
+                    ${createAccordionSection('Module(s)', moduleCheckboxes, 'module')}
+                    ${createAccordionSection('Content Area(s)', contentAreaCheckboxes, 'contentArea')}
+                    ${createAccordionSection('Syllabus Outcome(s)', outcomeCheckboxes, 'outcome')}
+                    ${createAccordionSection('Cognitive Verb(s)', cognitiveVerbCheckboxes, 'cognitiveVerb')}
+                </div>`;
+            
+            const marksContent = question.subQuestions.length > 0 ?
+                `<div class="h-10 flex items-center justify-center bg-gray-800 rounded-md text-gray-400 text-sm">Calculated from sub-parts</div>` :
+                `<input type="number" value="${question.maxMarks}" min="0" step="0.5" class="mt-1 w-full rounded-md bg-gray-600 border-gray-500 shadow-sm p-2 text-white" data-field="maxMarks">`;
+
+            questionFormContent.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 pb-4 border-b border-gray-700">
+                    <div>
+                        <label class="text-xs font-medium text-gray-400">Question Number / Part Label</label>
+                        <input type="text" value="${question.number}" class="mt-1 w-full rounded-md bg-gray-600 border-gray-500 shadow-sm p-2 text-white" data-field="number" ${isMainQuestionInState ? 'disabled' : ''}>
+                    </div>
+                     <div>
+                        <label class="text-xs font-medium text-gray-400">Max Marks</label>
+                        ${marksContent}
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="text-xs font-medium text-gray-400">Specifics/Notes</label>
+                        <input type="text" value="${question.notes}" class="mt-1 w-full rounded-md bg-gray-600 border-gray-500 shadow-sm p-2 text-white" data-field="notes">
+                    </div>
+                </div>
+                ${syllabusDetailsSection}
+            `;
+        }
+
+        const createCheckbox = (value, isChecked) => `
+            <label class="flex items-center space-x-2 text-sm p-1 rounded-md hover:bg-gray-700/50">
+                <input type="checkbox" value="${value}" class="rounded border-gray-500 bg-gray-600 text-indigo-500 shadow-sm focus:ring-indigo-500" ${isChecked ? 'checked' : ''}>
+                <span>${value}</span>
+            </label>`;
+        
+        questionFormContent.addEventListener('change', (e) => {
+            if (!e.target.matches('input[type="checkbox"]')) return;
+            const question = getFocusedQuestionInModal();
+            if (!question) return;
+
+            const fieldContainer = e.target.closest('[data-field]');
+            if (!fieldContainer) return;
+            
+            const field = fieldContainer.dataset.field;
+            const checkedBoxes = fieldContainer.querySelectorAll('input:checked');
+            question[field] = Array.from(checkedBoxes).map(cb => cb.value);
+
+            if (field === 'module') {
+                const openDetails = questionFormContent.querySelector('details[open]');
+                const wasOpen = openDetails?.querySelector('[data-field="module"]');
+                
+                const syllabus = state.selectedSyllabus ? syllabusData[state.selectedSyllabus] : null;
+                let contentAreaCheckboxes = '<p class="text-sm text-gray-500">Select module(s) to see options.</p>';
+                let outcomeCheckboxes = '<p class="text-sm text-gray-500">Select module(s) to see options.</p>';
+
+                if (syllabus) {
+                    const selectedModules = syllabus.modules.filter(m => question.module.includes(m.name));
+                    if(selectedModules.length > 0) {
+                        const allContentAreas = [...new Set(selectedModules.flatMap(m => m.contentAreas))];
+                        const previouslySelectedContent = new Set(question.contentArea);
+                        contentAreaCheckboxes = allContentAreas.map(c => createCheckbox(c, previouslySelectedContent.has(c))).join('');
+                        
+                        const allOutcomes = new Map();
+                        selectedModules.forEach(m => {
+                            const isYr11 = parseInt(m.outcomes[0].split('-')[0], 10) === 11;
+                            const relevantWsOutcomes = isYr11 ? wsOutcomes.yr11 : wsOutcomes.yr12;
+                            [...relevantWsOutcomes, ...m.outcomes].forEach(o => {
+                                const fullCode = `${syllabus.prefix}${o}`;
+                                allOutcomes.set(fullCode, fullCode);
+                            });
+                        });
+                        const previouslySelectedOutcomes = new Set(question.outcome);
+                        outcomeCheckboxes = Array.from(allOutcomes.keys()).sort().map(fullCode => createCheckbox(fullCode, previouslySelectedOutcomes.has(fullCode))).join('');
+                    }
+                }
+                
+                const contentAreaContainer = questionFormContent.querySelector('[data-field="contentArea"]');
+                const outcomeContainer = questionFormContent.querySelector('[data-field="outcome"]');
+                if (contentAreaContainer) contentAreaContainer.innerHTML = contentAreaCheckboxes;
+                if (outcomeContainer) outcomeContainer.innerHTML = outcomeCheckboxes;
+
+                if (wasOpen) {
+                    openDetails.open = true;
+                }
+            }
+        });
+
+        questionFormContent.addEventListener('input', (e) => {
+             const question = getFocusedQuestionInModal();
+             if (!question) return;
+             const fieldEl = e.target.closest('[data-field]');
+             if(!fieldEl) return;
+             const field = fieldEl.dataset.field;
+             question[field] = fieldEl.value;
+             debouncedAutoSave();
+        });
+        
+        questionFormContent.addEventListener('toggle', e => {
+            if(e.target.open) {
+                const group = e.target.dataset.accordionGroup;
+                document.querySelectorAll(`#question-form-content details[data-accordion-group="${group}"]`).forEach(details => {
+                    if (details !== e.target) {
+                        details.open = false;
+                    }
+                });
+            }
+        }, true);
+        
+        function closeQuestionModal() {
+            questionModal.style.display = 'none';
+            state.editingQuestion = null;
+        }
+
+        function saveAndEditNext() {
+            if (!state.editingQuestion) return;
+            
+            const { isNew, originalParentId } = state.editingQuestion;
+            saveQuestionFromModal(true); // Save the current state without closing
+
+            const allFlatQuestions = getAllQuestionsFlat();
+            const savedQuestionId = getFocusedQuestionInModal().id;
+            const currentIndex = allFlatQuestions.findIndex(q => q.id === savedQuestionId);
+
+            if (currentIndex > -1 && currentIndex < allFlatQuestions.length - 1) {
+                const nextQuestionId = allFlatQuestions[currentIndex + 1].id;
+                closeQuestionModal();
+                openQuestionModal(nextQuestionId);
+            } else {
+                 closeQuestionModal();
+                 updateParentQuestionData(true);
+            }
+        }
+
+        function saveQuestionFromModal(isChained = false) {
+            if (!state.editingQuestion) return;
+            const focusedQuestion = getFocusedQuestionInModal();
+            const form = questionFormContent;
+            
+            const isMainQuestionInState = !state.editingQuestion.originalParentId;
+
+            if(!isMainQuestionInState) {
+                 focusedQuestion.number = form.querySelector('[data-field="number"]').value;
+            }
+            focusedQuestion.notes = form.querySelector('[data-field="notes"]').value;
+
+            if (focusedQuestion.subQuestions.length === 0) {
+                 const marksInput = form.querySelector('[data-field="maxMarks"]');
+                 if (marksInput) {
+                     focusedQuestion.maxMarks = parseFloat(marksInput.value) || 0;
+                 }
+            }
+            
+            const { topLevelQuestion, isNew, originalParentId, originalQuestionId } = state.editingQuestion;
+            
+            if (isNew) {
+                if (originalParentId) {
+                    findQuestionById(originalParentId).subQuestions.push(topLevelQuestion);
+                } else {
+                    state.questions.push(topLevelQuestion);
+                }
+            } else {
+                const parentOfOriginal = findQuestionAndParent(originalQuestionId, state.questions).parent;
+                if (parentOfOriginal) {
+                    const index = parentOfOriginal.subQuestions.findIndex(q => q.id === originalQuestionId);
+                    parentOfOriginal.subQuestions[index] = topLevelQuestion;
+                } else {
+                    const index = state.questions.findIndex(q => q.id === originalQuestionId);
+                    state.questions[index] = topLevelQuestion;
+                }
+            }
+
+            if(!isChained) {
+                updateParentQuestionData(true);
+                closeQuestionModal();
+            }
+            debouncedAutoSave();
+        }
+        
+        saveQuestionModalBtn.addEventListener('click', () => saveQuestionFromModal(false));
+        saveAndEditNextBtn.addEventListener('click', saveAndEditNext);
+        cancelQuestionModalBtn.addEventListener('click', closeQuestionModal);
+
+        function updateParentQuestionData(fullRender = true) {
+            const aggregateAndUpdate = (questions) => {
+                questions.forEach(q => {
+                    if (q.subQuestions.length > 0) {
+                        aggregateAndUpdate(q.subQuestions); // Recurse first
+
+                        const leaves = getLeafQuestions(q.subQuestions);
+                        const allModules = new Set(leaves.flatMap(leaf => leaf.module));
+                        const allContent = new Set(leaves.flatMap(leaf => leaf.contentArea));
+                        const allOutcomes = new Set(leaves.flatMap(leaf => leaf.outcome));
+                        const allVerbs = new Set(leaves.flatMap(leaf => leaf.cognitiveVerb));
+
+                        q.module = Array.from(allModules).sort();
+                        q.contentArea = Array.from(allContent).sort();
+                        q.outcome = Array.from(allOutcomes).sort();
+                        q.cognitiveVerb = Array.from(allVerbs).sort();
+                        q.maxMarks = leaves.reduce((sum, leaf) => sum + parseFloat(leaf.maxMarks || 0), 0);
+                    }
+                });
+            };
+            aggregateAndUpdate(state.questions);
+
+            if (fullRender) {
+                renderQuestionSetup();
+            } else {
+                // Just update the parent mark totals in the DOM without a full re-render
+                const allQuestionWrappers = examStructureContainer.querySelectorAll('[data-id]');
+                allQuestionWrappers.forEach(wrapper => {
+                    const questionId = wrapper.dataset.id;
+                    const question = findQuestionById(questionId);
+                    if (question && question.subQuestions.length > 0) { 
+                        const totalSpan = wrapper.querySelector('.parent-mark-total');
+                        if (totalSpan) {
+                            totalSpan.textContent = `Total: ${question.maxMarks}`;
+                        }
+                    }
+                });
+            }
+            debouncedAutoSave();
+        }
+        
+        syllabusSelect.addEventListener('change', () => {
+            state.selectedSyllabus = syllabusSelect.value;
+            debouncedAutoSave();
+        });
+
+        // Exam Builder Logic
+        examBuilderBtn.addEventListener('click', () => {
+            if (!checkSyllabusSelected()) return;
+            state.examScaffold = [{ name: 'Section I', type: 'mc', count: 20, marks: 1, questions: [] }];
+            renderExamBuilder();
+            examBuilderModal.style.display = 'block';
+        });
+
+        cancelExamBuilderBtn.addEventListener('click', () => {
+            examBuilderModal.style.display = 'none';
+        });
+
+        buildExamBtn.addEventListener('click', () => {
+            state.questions = [];
+            let questionCounter = 1;
+
+            state.examScaffold.forEach(section => {
+                if(section.type === 'mc') {
+                    for(let i=0; i<section.count; i++) {
+                        const q = createQuestionObject(questionCounter.toString());
+                        q.maxMarks = section.marks;
+                        q.notes = section.name;
+                        state.questions.push(q);
+                        questionCounter++;
+                    }
+                } else { // long answer
+                    section.questions.forEach(scaffoldQ => {
+                        const q = createQuestionObject(questionCounter.toString());
+                        q.notes = section.name;
+                        q.subQuestions = parseSubparts(scaffoldQ.subParts);
+                        state.questions.push(q);
+                        questionCounter++;
+                    });
+                }
+            });
+            updateParentQuestionData(true);
+            examBuilderModal.style.display = 'none';
+
+            if (!state.selectedSyllabus) {
+                console.error("A syllabus must be selected to detail questions.");
+                return;
+            }
+
+            // Automatically open the first question for editing
+            if (state.questions.length > 0) {
+                openQuestionModal(state.questions[0].id);
+            }
+        });
+
+        function parseSubparts(str) {
+            if (!str || !str.trim()) return [];
+            const parts = str.split(',').map(s => s.trim()).filter(Boolean);
+
+            const parsePart = (partStr, level) => {
+                const subMatch = partStr.match(/(.+)\((.*)\)/);
+                if (subMatch) {
+                    const number = subMatch[1].trim();
+                    const subStr = subMatch[2];
+                    const question = createQuestionObject(number);
+                    question.subQuestions = subStr.split(';').map(s => s.trim()).filter(Boolean).map((p, i) => createQuestionObject(toRomanNumeral(i + 1)));
+                    return question;
+                } else {
+                    return createQuestionObject(partStr);
+                }
+            };
+            return parts.map(p => parsePart(p, 1));
+        }
+
+
+        function renderExamBuilder() {
+            examBuilderContent.innerHTML = state.examScaffold.map((section, sectionIndex) => {
+                let questionCounter = 1;
+                for(let i=0; i < sectionIndex; i++) {
+                     if (state.examScaffold[i].type === 'mc') {
+                         questionCounter += parseInt(state.examScaffold[i].count, 10);
+                     } else {
+                           questionCounter += state.examScaffold[i].questions.length;
+                     }
+                }
+
+                const mcControls = `
+                    <div class="flex items-end gap-2">
+                        <div>
+                            <label class="text-xs font-medium text-gray-400">Number of Qs</label>
+                            <input type="number" value="${section.count}" oninput="state.examScaffold[${sectionIndex}].count = this.value" class="mt-1 w-full p-2 rounded-md bg-gray-600">
+                        </div>
+                        <div>
+                            <label class="text-xs font-medium text-gray-400">Marks each</label>
+                            <input type="number" value="${section.marks}" oninput="state.examScaffold[${sectionIndex}].marks = this.value" class="mt-1 w-full p-2 rounded-md bg-gray-600">
+                        </div>
+                    </div>`;
+                
+                const longAnswerControls = section.questions.map((q, qIndex) => `
+                    <div class="flex items-center gap-2">
+                         <label class="text-sm font-semibold text-gray-300">Q${questionCounter + qIndex}</label>
+                         <input type="text" placeholder="e.g. a, b(i;ii), c" value="${q.subParts}" oninput="state.examScaffold[${sectionIndex}].questions[${qIndex}].subParts = this.value" class="flex-1 p-2 rounded-md bg-gray-600" >
+                         <button class="remove-long-q-btn p-1 text-red-400" data-section-index="${sectionIndex}" data-q-index="${qIndex}">✕</button>
+                    </div>
+                `).join('');
+
+                return `
+                <div class="p-4 border border-gray-700 rounded-lg bg-gray-800/50">
+                    <div class="flex justify-between items-center mb-4">
+                         <input type="text" value="${section.name}" oninput="state.examScaffold[${sectionIndex}].name = this.value" class="text-lg font-semibold bg-transparent text-white p-1 rounded-md focus:bg-gray-700">
+                         <button class="remove-section-btn text-red-400" data-section-index="${sectionIndex}">Remove Section</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-sm font-medium text-gray-400">Section Type</label>
+                            <select onchange="state.examScaffold[${sectionIndex}].type = this.value; renderExamBuilder();" class="mt-1 w-full p-2 rounded-md bg-gray-700 text-white">
+                                <option value="mc" ${section.type === 'mc' ? 'selected' : ''}>Multiple Choice</option>
+                                <option value="long" ${section.type === 'long' ? 'selected' : ''}>Long Answer</option>
+                            </select>
+                        </div>
+                        ${section.type === 'mc' ? mcControls : ''}
+                    </div>
+                    ${section.type === 'long' ? `
+                        <div class="mt-4 pt-4 border-t border-gray-600 space-y-2">
+                             <h4 class="text-sm font-medium text-gray-300">Long Answer Questions</h4>
+                            ${longAnswerControls}
+                            <div class="flex items-end gap-2 pt-2">
+                                <input type="number" min="1" value="1" class="w-20 p-2 rounded-md bg-gray-600">
+                                <button class="add-long-q-btn flex-1 text-sm p-2 rounded-md bg-gray-700 hover:bg-gray-600" data-section-index="${sectionIndex}">+ Add Question(s)</button>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>`;
+            }).join('') + 
+            `<button id="add-section-btn" class="w-full text-sm p-2 mt-4 rounded-md bg-gray-700 hover:bg-gray-600">+ Add Section</button>`;
+        }
+        
+        examBuilderContent.addEventListener('click', e => {
+            const button = e.target.closest('button');
+            if(!button) return;
+
+            if(button.id === 'add-section-btn') {
+                state.examScaffold.push({name: `Section ${toRomanNumeral(state.examScaffold.length + 1).toUpperCase()}`, type: 'long', questions: []});
+                renderExamBuilder();
+            }
+            if(button.matches('.remove-section-btn')) {
+                state.examScaffold.splice(button.dataset.sectionIndex, 1);
+                renderExamBuilder();
+            }
+            if(button.matches('.add-long-q-btn')) {
+                const sectionIndex = button.dataset.sectionIndex;
+                const input = button.previousElementSibling;
+                const count = parseInt(input.value, 10) || 1;
+                for (let i = 0; i < count; i++) {
+                    state.examScaffold[sectionIndex].questions.push({ subParts: '' });
+                }
+                renderExamBuilder();
+            }
+             if(button.matches('.remove-long-q-btn')) {
+                state.examScaffold[button.dataset.sectionIndex].questions.splice(button.dataset.qIndex, 1);
+                renderExamBuilder();
+            }
+        });
+        
+        
+        // --- DATA ENTRY & RENDER LOGIC ---
+        function render() {
+            syllabusSelect.value = state.selectedSyllabus;
+            updateParentQuestionData(true); 
+            if (!dataSection.classList.contains('hidden')) {
+                renderDataEntryView();
+            }
+            renderAnalysis();
+            renderIndividualAnalysisSelector();
+        }
+
+        function renderDataEntryView() {
+            if (!state.selectedStudentId && state.students.length > 0) {
+                state.selectedStudentId = state.students[0].id;
+            }
+            renderStudentList();
+            renderStudentForm();
+        }
+        
+        function handleNameChange(field, event) {
+            const student = state.students.find(s => s.id === state.selectedStudentId);
+            if(student) {
+                student[field] = event.target.value;
+            }
+            renderStudentList(); // Re-render list to update name
+            renderIndividualAnalysisSelector();
+            debouncedAutoSave();
+        }
+
+        function handleScoreChange(questionId, event) {
+            const student = state.students.find(s => s.id === state.selectedStudentId);
+            const question = findQuestionById(questionId);
+            if (!student || !question) return;
+
+            const value = event.target.value;
+            let score = null;
+
+            if (value === '') { 
+                delete student.responses[questionId]; 
+            } else {
+                let parsedScore = parseFloat(value);
+                if(isNaN(parsedScore)) return;
+                score = Math.max(0, Math.min(parsedScore, parseFloat(question.maxMarks)));
+                event.target.value = score;
+                student.responses[questionId] = score;
+            }
+            
+            event.target.parentElement.nextElementSibling.className = `w-16 text-center p-2 rounded-md ${getColorForScore(score, question.maxMarks)}`;
+
+            updateStudentTotalInDOM();
+            renderAnalysis();
+            debouncedAutoSave();
+        }
+
+        function updateStudentTotalInDOM() {
+            const student = state.students.find(s => s.id === state.selectedStudentId);
+            if (!student) return;
+
+            const leafQs = getLeafQuestions(state.questions);
+            const totalMax = leafQs.reduce((s, q) => s + parseFloat(q.maxMarks || 0), 0);
+            const totalScore = leafQs.reduce((sum, q) => sum + (student.responses[q.id] || 0), 0);
+            
+            const totalScoreEl = document.getElementById('student-total-score');
+            if (!totalScoreEl) return;
+            
+            const perc = totalMax > 0 ? (totalScore / totalMax * 100) : 0;
+            const color = perc >= 80 ? 'text-green-400' : perc < 50 ? 'text-red-400' : 'text-yellow-400';
+
+            totalScoreEl.className = `text-lg font-bold ${color}`;
+            totalScoreEl.innerHTML = `${totalScore.toFixed(1)} / ${totalMax.toFixed(1)} (${perc.toFixed(1)}%)`;
+        }
+
+        function renderStudentList() {
+            const studentListHtml = state.students.map(s => {
+                const isActive = s.id === state.selectedStudentId;
+                const studentName = (s.lastName || s.firstName) ? `${s.lastName || ''}, ${s.firstName || ''}`.trim() : 'Unnamed Student';
+                return `
+                <div data-student-id="${s.id}" class="flex items-center justify-between p-2 rounded-md cursor-pointer ${isActive ? 'bg-indigo-600 text-white' : 'hover:bg-gray-700'}">
+                    <span>${studentName}</span>
+                    <button class="remove-student-btn text-red-400 hover:text-red-300 ${state.deleteMode ? '' : 'hidden'}" data-id="${s.id}" title="Remove Student">✕</button>
+                </div>
+                `
+            }).join('');
+
+            const toggleChecked = state.deleteMode;
+            studentListContainer.innerHTML = `
+                <h3 class="text-lg font-semibold mb-3 text-white">Class List</h3>
+                <div class="space-y-1 mb-4">${studentListHtml}</div>
+                <div class="space-y-2 pt-4 border-t border-gray-700">
+                    <button id="add-student-btn" class="w-full inline-flex justify-center items-center px-3 py-1.5 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">
+                        Add Student
+                    </button>
+                    <div class="flex items-center justify-center gap-2 pt-2">
+                        <label for="toggle-delete-btn" class="text-sm font-medium text-red-400">Delete Mode:</label>
+                        <button id="toggle-delete-btn" class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent ${toggleChecked ? 'bg-red-600' : 'bg-gray-600'} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-800" type="button" role="switch" aria-checked="${toggleChecked}">
+                            <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${toggleChecked ? 'translate-x-5' : 'translate-x-0'}"></span>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function renderStudentForm() {
+            const student = state.students.find(s => s.id === state.selectedStudentId);
+
+            if (!student) {
+                studentFormContainer.innerHTML = `<div class="flex items-center justify-center h-full bg-gray-900/50 rounded-lg"><p class="text-gray-500">Select a student from the list to enter their results.</p></div>`;
+                return;
+            }
+
+            const leafQs = getLeafQuestions(state.questions);
+            const questionsHtml = leafQs.map((q, index) => {
+                const score = student.responses[q.id];
+                const colorClass = getColorForScore(score, q.maxMarks);
+                 const tooltipHtml = `Module: ${q.module.join(', ') || 'N/A'}\nContent: ${q.contentArea.join(', ') || 'N/A'}\nOutcome: ${q.outcome.join(', ') || 'N/A'}\nVerb: ${q.cognitiveVerb.join(', ') || 'N/A'}\nNotes: ${q.notes || 'N/A'}`;
+
+                return `
+                <div class="flex items-center gap-4 py-2 border-b border-gray-700">
+                    <div class="flex-shrink-0 w-24 text-sm font-semibold text-gray-300 tooltip" title="${tooltipHtml}">
+                       ${q.displayNumber.replace('Q','Q ')}
+                        <span class="tooltiptext">${tooltipHtml.replace(/\n/g, '<br>')}</span>
+                    </div>
+                    <div class="flex-grow">
+                        <input type="number" step="0.5" class="w-full p-2 text-center text-sm rounded-md text-white border-gray-600 bg-gray-700 focus:ring-2 focus:ring-offset-1 focus:ring-offset-gray-800 focus:ring-indigo-500 shadow-sm"
+                        value="${score === undefined ? '' : score}" min="0" max="${q.maxMarks || 0}" onchange="handleScoreChange('${q.id}', event)" data-question-index="${index}">
+                    </div>
+                    <div class="w-16 text-center p-2 rounded-md ${colorClass}">
+                        / ${q.maxMarks || 0}
+                    </div>
+                </div>`;
+            }).join('');
+            
+            const currentStudentIndex = state.students.findIndex(s => s.id === state.selectedStudentId);
+
+            studentFormContainer.innerHTML = `
+                <div class="bg-gray-900/50 p-6 rounded-lg">
+                    <div class="flex flex-col sm:flex-row gap-4 mb-6 pb-6 border-b border-gray-700">
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-400">Last Name</label>
+                            <input type="text" value="${student.lastName}" onchange="handleNameChange('lastName', event)" class="mt-1 w-full bg-gray-700 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Last Name">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-400">First Name</label>
+                            <input type="text" value="${student.firstName}" onchange="handleNameChange('firstName', event)" class="mt-1 w-full bg-gray-700 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="First Name">
+                        </div>
+                        <div class="flex-shrink-0 text-right">
+                            <label class="block text-sm font-medium text-gray-400">Total Score</label>
+                             <div id="student-total-score" class="text-lg font-bold mt-1"></div>
+                        </div>
+                    </div>
+
+                    <div id="question-entry-list" class="space-y-1 max-h-[50vh] overflow-y-auto pr-2">${questionsHtml}</div>
+
+                    <div class="flex justify-between mt-6 pt-6 border-t border-gray-700">
+                        <button id="prev-student-btn" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-gray-600 hover:bg-gray-500" ${currentStudentIndex === 0 ? 'disabled' : ''}>Previous</button>
+                        <button id="next-student-btn" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Save & Next</button>
+                    </div>
+                </div>
+            `;
+            updateStudentTotalInDOM(); // Initial calculation
+
+            document.getElementById('prev-student-btn').addEventListener('click', () => {
+                const currentIndex = state.students.findIndex(s => s.id === state.selectedStudentId);
+                if (currentIndex > 0) {
+                    state.selectedStudentId = state.students[currentIndex - 1].id;
+                    renderDataEntryView();
+                }
+            });
+             document.getElementById('next-student-btn').addEventListener('click', () => {
+                const currentIndex = state.students.findIndex(s => s.id === state.selectedStudentId);
+                if (currentIndex < state.students.length - 1) {
+                    state.selectedStudentId = state.students[currentIndex + 1].id;
+                    renderDataEntryView();
+                } else {
+                    document.getElementById('add-student-btn').click();
+                }
+            });
+            studentFormContainer.querySelector('#question-entry-list').addEventListener('keydown', e => {
+                 if(!['ArrowUp', 'ArrowDown'].includes(e.key)) return;
+                 const target = e.target;
+                 if (target.tagName !== 'INPUT' || target.type !== 'number') return;
+                 e.preventDefault();
+
+                 const currentQI = parseInt(target.dataset.questionIndex, 10);
+                 const numQuestions = getLeafQuestions(state.questions).length;
+                 let nextQI = currentQI;
+
+                 if (e.key === 'ArrowUp' && currentQI > 0) nextQI--;
+                 if (e.key === 'ArrowDown' && currentQI < numQuestions - 1) nextQI++;
+                
+                 const nextInput = studentFormContainer.querySelector(`[data-question-index="${nextQI}"]`);
+                 if (nextInput) {
+                     nextInput.focus();
+                     nextInput.select();
+                 }
+            });
+        }
+        
+        // --- EVENT DELEGATION FOR STUDENT LIST ---
+        studentListContainer.addEventListener('click', e => {
+            const studentDiv = e.target.closest('[data-student-id]');
+            const removeBtn = e.target.closest('.remove-student-btn');
+            const addBtn = e.target.closest('#add-student-btn');
+            const deleteToggle = e.target.closest('#toggle-delete-btn');
+
+            if (removeBtn) {
+                e.stopPropagation();
+                const studentId = removeBtn.dataset.id;
+                state.students = state.students.filter(st => st.id !== studentId);
+                if (state.selectedStudentId === studentId) {
+                    state.selectedStudentId = state.students.length > 0 ? state.students[0].id : null;
+                }
+            } else if (addBtn) {
+                const newStudent = createStudentObject();
+                state.students.push(newStudent);
+                state.selectedStudentId = newStudent.id;
+            } else if (deleteToggle) {
+                state.deleteMode = !state.deleteMode;
+                renderStudentList();
+                return; // Prevent full re-render and auto-save just for toggle
+            } else if (studentDiv) {
+                state.selectedStudentId = studentDiv.dataset.studentId;
+            }
+            render();
+            debouncedAutoSave();
+        });
+
+        function getAnalysisData(student = null) {
+            const studentsToAnalyze = student ? [student] : state.students.filter(s => s.lastName && s.firstName);
+            if (studentsToAnalyze.length === 0) {
+                return { moduleData: {}, contentData: {}, outcomeData: {}, verbData: {}, bandData: {} };
+            }
+
+            const moduleData = {};
+            const contentData = {};
+            const outcomeData = {};
+            const verbData = {};
+            
+            getLeafQuestions(state.questions).forEach(q => {
+                const maxMarks = parseFloat(q.maxMarks || 0);
+                if (isNaN(maxMarks) || maxMarks === 0) return;
+                
+                const processCategory = (categoryData, itemKeys, distributedMaxMarks) => {
+                    if (itemKeys.length === 0) itemKeys = ['Uncategorised'];
+                    itemKeys.forEach(key => {
+                        if (!categoryData[key]) categoryData[key] = { total: 0, scored: 0, students: {} };
+                        studentsToAnalyze.forEach(s => {
+                            if (!categoryData[key].students[s.id]) categoryData[key].students[s.id] = { total: 0, scored: 0 };
+                            categoryData[key].students[s.id].total += distributedMaxMarks;
+                            if (s.responses[q.id] !== undefined) {
+                                categoryData[key].students[s.id].scored += s.responses[q.id] / itemKeys.length;
+                            }
+                        });
+                    });
+                };
+                
+                processCategory(moduleData, q.module, maxMarks / (q.module.length || 1));
+                processCategory(contentData, q.contentArea, maxMarks / (q.contentArea.length || 1));
+                processCategory(outcomeData, q.outcome, maxMarks / (q.outcome.length || 1));
+                processCategory(verbData, q.cognitiveVerb, maxMarks / (q.cognitiveVerb.length || 1));
+            });
+
+            [moduleData, contentData, outcomeData, verbData].forEach(dataObject => {
+                Object.values(dataObject).forEach(item => {
+                    studentsToAnalyze.forEach(s => {
+                        if (item.students[s.id]) {
+                            item.total += item.students[s.id].total;
+                            item.scored += item.students[s.id].scored;
+                        }
+                    });
+                });
+            });
+
+            // Performance Band Data
+            const bandData = { '90-100%': 0, '80-89%': 0, '70-79%': 0, '60-69%': 0, '50-59%': 0, '<50%': 0 };
+            const leafQs = getLeafQuestions(state.questions);
+            const totalMax = leafQs.reduce((s, q) => s + parseFloat(q.maxMarks || 0), 0);
+            if (totalMax > 0 && !student) {
+                studentsToAnalyze.forEach(s => {
+                    const totalScore = leafQs.reduce((sum, q) => sum + (s.responses[q.id] || 0), 0);
+                    const perc = (totalScore / totalMax) * 100;
+                    if (perc >= 90) bandData['90-100%']++;
+                    else if (perc >= 80) bandData['80-89%']++;
+                    else if (perc >= 70) bandData['70-79%']++;
+                    else if (perc >= 60) bandData['60-69%']++;
+                    else if (perc >= 50) bandData['50-59%']++;
+                    else bandData['<50%']++;
+                });
+            }
+
+            return { moduleData, contentData, outcomeData, verbData, bandData };
+        }
+
+        function createAnalysisUI(title, data, chartId) {
+            if (!data || Object.keys(data).length === 0) return '';
+            
+            const chartContainerId = `${chartId}-container`;
+            const barsContainerId = `${chartId}-bars`;
+            const isBandChart = chartId.includes('Band');
+
+            const barsHtml = Object.entries(data).sort((a,b)=> a[0].localeCompare(b[0])).map(([key, d]) => {
+                if (isBandChart) {
+                    const totalStudents = Object.values(data).reduce((sum, count) => sum + count, 0);
+                    const percentage = totalStudents > 0 ? (d / totalStudents * 100) : 0;
+                    return `<div class="p-3 bg-gray-700/50 rounded-md">
+                                 <div class="flex justify-between items-center mb-1"><span class="font-bold text-indigo-400 text-sm">${key}</span><span class="text-sm font-semibold">${d} student(s)</span></div>
+                                 <div class="w-full bg-gray-600 rounded-full h-2"><div class="bg-indigo-500 h-2 rounded-full" style="width: ${percentage}%"></div></div>
+                                 </div>`;
+                } else {
+                    const mastery = d.total > 0 ? (d.scored / d.total * 100) : 0;
+                    return `<div class="p-3 bg-gray-700/50 rounded-md">
+                            <div class="flex justify-between items-center mb-1"><span class="font-bold text-indigo-400 text-sm">${key}</span><span class="text-sm font-semibold">${mastery.toFixed(1)}%</span></div>
+                            <div class="w-full bg-gray-600 rounded-full h-2"><div class="bg-indigo-500 h-2 rounded-full" style="width: ${mastery}%"></div></div>
+                            <div class="text-xs text-gray-400 mt-1 text-right">${d.scored.toFixed(1)}/${d.total.toFixed(1)} marks</div></div>`;
+                }
+            }).join('');
+            
+            const uiHtml = `
+                <div class="bg-gray-800/50 p-4 rounded-lg">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-lg font-semibold text-white">${title}</h3>
+                        <div class="flex items-center gap-2">
+                            <div class="flex rounded-md shadow-sm bg-gray-700 p-0.5">
+                                <button data-view-id="${chartId}" data-view-type="bars" class="view-toggle-btn px-2 py-1 text-xs font-medium rounded-md text-white bg-indigo-600">Bars</button>
+                                <button data-view-id="${chartId}" data-view-type="bar" class="view-toggle-btn px-2 py-1 text-xs font-medium rounded-md text-gray-300">Column</button>
+                                <button data-view-id="${chartId}" data-view-type="pie" class="view-toggle-btn px-2 py-1 text-xs font-medium rounded-md text-gray-300">Pie</button>
+                            </div>
+                            <button data-export-id="${chartId}-wrapper" class="export-chart-btn px-2 py-1 text-xs font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">Export Image</button>
+                        </div>
+                    </div>
+                    <div id="${chartId}-wrapper">
+                        <div id="${barsContainerId}" class="p-2 space-y-3">${barsHtml}</div>
+                        <div id="${chartContainerId}" class="p-2 rounded-md bg-gray-900/50 hidden">
+                            <canvas id="${chartId}"></canvas>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            setTimeout(() => {
+                if (document.getElementById(chartId)) {
+                    renderChart(chartId, data, 'bar');
+                }
+            }, 0);
+
+            return uiHtml;
+        }
+
+        function renderAnalysis(student = null) {
+            const isIndividual = !!student;
+            const container = isIndividual ? individualAnalysisContent : analysisContent;
+            
+            const hasResponses = state.students.some(s => Object.keys(s.responses).length > 0);
+             if (!hasResponses && !isIndividual) {
+                 container.innerHTML = `<p class="text-center text-gray-500 py-8">Analysis will appear here once you enter results.</p>`;
+                 return;
+            }
+
+            const { moduleData, contentData, outcomeData, verbData, bandData } = getAnalysisData(student);
+            
+            const moduleHtml = createAnalysisUI(isIndividual ? 'Module Performance' : 'Class Performance by Module', moduleData, isIndividual ? 'indivModuleChart' : 'classModuleChart');
+            const contentHtml = createAnalysisUI(isIndividual ? 'Content Area Performance' : 'Class Performance by Content Area', contentData, isIndividual ? 'indivContentChart' : 'classContentChart');
+            const outcomeHtml = createAnalysisUI(isIndividual ? 'Syllabus Outcome Performance' : 'Class Performance by Syllabus Outcome', outcomeData, isIndividual ? 'indivOutcomeChart' : 'classOutcomeChart');
+            const verbHtml = createAnalysisUI(isIndividual ? 'Cognitive Verb Performance' : 'Class Performance by Cognitive Verb', verbData, isIndividual ? 'indivVerbChart' : 'classVerbChart');
+            const bandHtml = !isIndividual ? createAnalysisUI('Class Performance Bands', bandData, 'classBandChart') : '';
+            
+            const fullHtml = `<div class="grid grid-cols-1 xl:grid-cols-2 gap-8">${moduleHtml}${contentHtml}${outcomeHtml}${verbHtml}${bandHtml}</div>`;
+
+            if (!moduleHtml && !contentHtml && !outcomeHtml && !verbHtml && !bandHtml) {
+                 container.innerHTML = `<p class="text-center text-gray-500 py-8">${isIndividual ? 'No results entered for this student.' : 'Enter student names to see class analysis.'}</p>`;
+            } else {
+                 container.innerHTML = fullHtml;
+            }
+        }
+
+        function renderChart(chartId, data, type) {
+            const ctx = document.getElementById(chartId);
+            if (!ctx || !data || Object.keys(data).length === 0) return;
+            
+            if (chartInstances[chartId]) {
+                chartInstances[chartId].destroy();
+            }
+
+            const sortedData = Object.entries(data).sort((a,b)=>a[0].localeCompare(b[0]));
+            const labels = sortedData.map(entry => entry[0]);
+            
+            let datasets;
+            const isIndividual = chartId.startsWith('indiv');
+            const activeStudents = state.students.filter(s => s.lastName && s.firstName);
+
+            if (chartId.includes('Band')) { // Special case for band chart
+                 datasets = [{
+                    label: '# of Students',
+                    data: sortedData.map(entry => entry[1]), // Use the value directly
+                    backgroundColor: labels.map((_, i) => `hsl(${210 + i * (150 / labels.length)}, 60%, 60%)`),
+                }];
+            } else if (type === 'bar' && !isIndividual && activeStudents.length > 0) {
+                const studentColors = activeStudents.map((_, i) => `hsl(${200 + i * (160 / activeStudents.length)}, 70%, 50%)`);
+                datasets = activeStudents.map((s, i) => ({
+                    label: `${s.lastName}, ${s.firstName}`,
+                    data: sortedData.map(([_, d]) => {
+                        const studentData = d.students[s.id];
+                        return studentData && studentData.total > 0 ? (studentData.scored / studentData.total * 100) : 0;
+                    }),
+                    backgroundColor: studentColors[i],
+                }));
+            } else {
+                 const chartColors = labels.map((_, i) => `hsl(${210 + i * (150 / labels.length)}, 60%, 60%)`);
+                 datasets = [{
+                    label: '% Mastery',
+                    data: sortedData.map(([_, d]) => d.total > 0 ? (d.scored / d.total * 100) : 0),
+                    backgroundColor: chartColors,
+                    borderColor: '#4f46e5',
+                    borderWidth: type === 'bar' ? 0 : 2,
+                }];
+            }
+
+            chartInstances[chartId] = new Chart(ctx.getContext('2d'), {
+                type: type,
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: type === 'pie',
+                     plugins: {
+                         legend: { position: type === 'pie' ? 'right' : 'top', display: (type === 'pie' || (type==='bar' && !isIndividual) || chartId.includes('Band')), labels: { color: '#d1d5db' } },
+                         tooltip: { callbacks: { label: (c) => chartId.includes('Band') ? `${c.label}: ${c.raw} students` : `${c.dataset.label || c.label}: ${c.raw.toFixed(1)}%` } }
+                    },
+                    scales: type === 'bar' ? { y: { beginAtZero: true, max: chartId.includes('Band') ? undefined : 100, ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }, x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } } } : {}
+                }
+            });
+        }
+        
+        document.addEventListener('click', e => {
+            if (e.target.matches('.view-toggle-btn')) {
+                const viewId = e.target.dataset.viewId;
+                const viewType = e.target.dataset.viewType;
+                
+                e.target.parentElement.querySelectorAll('.view-toggle-btn').forEach(btn => {
+                    btn.classList.remove('bg-indigo-600', 'text-white');
+                    btn.classList.add('text-gray-300');
+                });
+                e.target.classList.add('bg-indigo-600', 'text-white');
+                
+                const chartContainer = document.getElementById(`${viewId}-container`);
+                const barsContainer = document.getElementById(`${viewId}-bars`);
+
+                if (viewType === 'bars') {
+                    chartContainer.classList.add('hidden');
+                    barsContainer.classList.remove('hidden');
+                } else {
+                    barsContainer.classList.add('hidden');
+                    chartContainer.classList.remove('hidden');
+                    const student = studentSelectForAnalysis.value ? state.students.find(s => s.id === studentSelectForAnalysis.value) : null;
+                    const { moduleData, contentData, outcomeData, verbData, bandData } = getAnalysisData(student);
+                    
+                    let data;
+                    if (viewId.includes('Module')) data = moduleData;
+                    else if (viewId.includes('Content')) data = contentData;
+                    else if (viewId.includes('Outcome')) data = outcomeData;
+                    else if (viewId.includes('Verb')) data = verbData;
+                    else if (viewId.includes('Band')) data = bandData;
+
+                    renderChart(viewId, data, viewType);
+                }
+            }
+            if (e.target.matches('.export-chart-btn')) {
+                const wrapperId = e.target.dataset.exportId;
+                const wrapper = document.getElementById(wrapperId);
+                if(wrapper) {
+                    html2canvas(wrapper, { backgroundColor: '#1f2937' }).then(canvas => {
+                        const link = document.createElement('a');
+                        link.download = `${wrapperId.replace('-wrapper', '')}-analysis.png`;
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                    });
+                }
+            }
+        });
+
+        function renderIndividualAnalysisSelector() {
+             const activeStudents = state.students.filter(s => s.lastName && s.firstName);
+            if (activeStudents.length > 0) {
+                individualAnalysisContainer.classList.remove('hidden');
+                const currentSelection = studentSelectForAnalysis.value;
+                studentSelectForAnalysis.innerHTML = '<option value="">Select a student...</option>';
+                activeStudents.sort((a,b) => a.lastName.localeCompare(b.lastName)).forEach(s => {
+                    const option = document.createElement('option');
+                    option.value = s.id;
+                    option.textContent = `${s.lastName}, ${s.firstName}`;
+                    if(s.id === currentSelection) option.selected = true;
+                    studentSelectForAnalysis.appendChild(option);
+                });
+            } else {
+                individualAnalysisContainer.classList.add('hidden');
+            }
+        }
+        
+        studentSelectForAnalysis.addEventListener('change', (e) => {
+            const studentId = e.target.value;
+            const individualPdfBtn = document.getElementById('generate-individual-pdf-report-btn');
+            if (studentId) {
+                const student = state.students.find(s => s.id === studentId);
+                renderAnalysis(student);
+                individualPdfBtn.classList.remove('hidden');
+                individualPdfBtn.onclick = () => generateIndividualPdfReport(student);
+            } else {
+                individualAnalysisContent.innerHTML = '<p class="text-center text-gray-500 py-8">Select a student to see their detailed analysis.</p>';
+                individualPdfBtn.classList.add('hidden');
+            }
+        });
+
+
+        // --- IMPORT/EXPORT & SESSION LOGIC ---
+        exportCsvBtn.addEventListener('click', () => {
+             if (state.students.length === 0) { return; }
+            const leafQs = getLeafQuestions(state.questions);
+            let csv = `"Last Name","First Name",${leafQs.map(q => `"${q.displayNumber.replace('Q', '')} (Max ${q.maxMarks})"`).join(",")},Total Score\r\n`;
+            state.students.filter(s => s.lastName && s.firstName).forEach(s => {
+                const total = leafQs.reduce((sum, q) => sum + (s.responses[q.id] || 0), 0);
+                const scores = leafQs.map(q => s.responses[q.id] === undefined ? '' : s.responses[q.id]);
+                csv += `"${s.lastName}","${s.firstName}",${scores.join(",")},${total.toFixed(1)}\r\n`;
+            });
+            const link = document.createElement("a");
+            link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
+            link.download = "exam_results.csv";
+            link.click();
+        });
+
+        saveSnapshotBtn.addEventListener('click', () => {
+            try {
+                localStorage.setItem('examTrackerManualSnapshot', JSON.stringify(state));
+                console.log('Snapshot saved to browser!');
+            } catch (e) {
+                console.error('Error saving snapshot:', e);
+            }
+        });
+
+        loadSnapshotBtn.addEventListener('click', () => {
+            const savedState = localStorage.getItem('examTrackerManualSnapshot');
+            if (savedState) {
+                state = JSON.parse(savedState);
+                if (state.questions.length > 0 && dataSection.classList.contains('hidden')) {
+                     setupSection.classList.add('hidden');
+                     dataSection.classList.remove('hidden');
+                }
+                render();
+                debouncedAutoSave();
+            } else {
+                console.warn('No saved snapshot found.');
+            }
+        });
+
+        exportJsonBtn.addEventListener('click', () => {
+            const jsonString = JSON.stringify(state, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `exam-session-${new Date().toISOString().slice(0,10)}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+        });
+
+        importJsonInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedState = JSON.parse(e.target.result);
+                    state = importedState;
+                     if (state.questions.length > 0 && dataSection.classList.contains('hidden')) {
+                         setupSection.classList.add('hidden');
+                         dataSection.classList.remove('hidden');
+                     }
+                    render();
+                    debouncedAutoSave();
+                } catch (error) {
+                    console.error('Error importing file:', error);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset input
+        });
+
+        resetSessionBtn.addEventListener('click', () => {
+            if (resetSessionBtn.dataset.confirm) {
+                state = getInitialState();
+                localStorage.removeItem('examTrackerAutoSession');
+                localStorage.removeItem('examTrackerManualSnapshot');
+                
+                setupSection.classList.remove('hidden');
+                dataSection.classList.add('hidden');
+                
+                render();
+
+                resetSessionBtn.textContent = 'Reset All Data';
+                delete resetSessionBtn.dataset.confirm;
+                resetSessionBtn.classList.replace('bg-yellow-600', 'bg-red-800');
+                resetSessionBtn.classList.replace('hover:bg-yellow-500', 'hover:bg-red-700');
+                
+            } else {
+                resetSessionBtn.dataset.confirm = 'true';
+                resetSessionBtn.textContent = 'Confirm Reset?';
+                resetSessionBtn.classList.replace('bg-red-800', 'bg-yellow-600');
+                resetSessionBtn.classList.replace('hover:bg-red-700', 'hover:bg-yellow-500');
+                setTimeout(() => {
+                    if (resetSessionBtn.dataset.confirm) {
+                        resetSessionBtn.textContent = 'Reset All Data';
+                        delete resetSessionBtn.dataset.confirm;
+                        resetSessionBtn.classList.replace('bg-yellow-600', 'bg-red-800');
+                        resetSessionBtn.classList.replace('hover:bg-yellow-500', 'hover:bg-red-700');
+                    }
+                }, 3000); // Revert after 3 seconds
+            }
+        });
+
+        // --- TEMPLATE LOGIC ---
+        const getTemplates = () => JSON.parse(localStorage.getItem('examTrackerTemplates') || '{}');
+        const saveTemplates = (templates) => localStorage.setItem('examTrackerTemplates', JSON.stringify(templates));
+
+        saveTemplateBtn.addEventListener('click', () => {
+            renderTemplateList();
+            templateModal.style.display = 'block';
+        });
+
+        loadTemplateBtn.addEventListener('click', () => {
+            renderTemplateList(true); // isLoadMode = true
+            templateModal.style.display = 'block';
+        });
+
+        saveNewTemplateBtn.addEventListener('click', () => {
+            const name = newTemplateNameInput.value.trim();
+            if(!name) {
+                console.error('Please provide a template name.');
+                return;
+            }
+            if (state.questions.length === 0) {
+                console.error('Cannot save an empty structure as a template.');
+                return;
+            }
+
+            const templates = getTemplates();
+            templates[name] = { questions: state.questions, selectedSyllabus: state.selectedSyllabus };
+            saveTemplates(templates);
+            newTemplateNameInput.value = '';
+            renderTemplateList();
+        });
+
+        function renderTemplateList(isLoadMode = false) {
+            const templates = getTemplates();
+            templateList.innerHTML = Object.keys(templates).length === 0 
+                ? '<p class="text-gray-400">No saved templates.</p>'
+                : Object.keys(templates).map(name => `
+                    <div class="flex justify-between items-center p-2 bg-gray-700 rounded-md">
+                        <span>${name}</span>
+                        <div>
+                            ${isLoadMode ? `<button class="load-template-item-btn text-blue-400 hover:text-blue-300 px-2" data-name="${name}">Load</button>` : ''}
+                            <button class="delete-template-btn text-red-400 hover:text-red-300 px-2" data-name="${name}">Delete</button>
+                        </div>
+                    </div>`).join('');
+        }
+
+        templateList.addEventListener('click', e => {
+            const name = e.target.dataset.name;
+            if (!name) return;
+
+            if (e.target.matches('.load-template-item-btn')) {
+                const templates = getTemplates();
+                const template = templates[name];
+                if (template) {
+                    state.questions = template.questions;
+                    state.selectedSyllabus = template.selectedSyllabus;
+                    render();
+                    debouncedAutoSave();
+                    templateModal.style.display = 'none';
+                }
+            } else if (e.target.matches('.delete-template-btn')) {
+                const templates = getTemplates();
+                delete templates[name];
+                saveTemplates(templates);
+                renderTemplateList(templateModal.querySelector('.load-template-item-btn') !== null);
+            }
+        });
+        
+        // --- PDF REPORTING ---
+        async function generateIndividualPdfReport(student) {
+            if (!student) return;
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'landscape' });
+            const analysisContainer = document.getElementById('individual-analysis-content');
+            console.log(`Generating PDF report for ${student.firstName} ${student.lastName}...`);
+
+            doc.setFontSize(22);
+            doc.text(`Performance Report for: ${student.firstName} ${student.lastName}`, 14, 20);
+            doc.setFontSize(12);
+            doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 28);
+            
+            let y = 40;
+
+            const addChartToPdf = async (chartWrapperId, title) => {
+                const chartWrapper = analysisContainer.querySelector(`#${chartWrapperId}`);
+                if (!chartWrapper || chartWrapper.clientHeight === 0) return;
+                
+                if (y > 180) { // Check if we need a new page
+                    doc.addPage();
+                    y = 20;
+                }
+
+                doc.setFontSize(16);
+                doc.text(title, 14, y);
+                y += 10;
+                
+                const canvas = await html2canvas(chartWrapper, { backgroundColor: '#1f2937', scale: 2 });
+                const imgData = canvas.toDataURL('image/png');
+                const imgProps = doc.getImageProperties(imgData);
+                const pdfWidth = doc.internal.pageSize.getWidth() - 28;
+                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                doc.addImage(imgData, 'PNG', 14, y, pdfWidth, pdfHeight);
+                y += pdfHeight + 10;
+            };
+
+            await addChartToPdf('indivModuleChart-wrapper', 'Performance by Module');
+            await addChartToPdf('indivContentChart-wrapper', 'Performance by Content Area');
+            await addChartToPdf('indivOutcomeChart-wrapper', 'Performance by Syllabus Outcome');
+            await addChartToPdf('indivVerbChart-wrapper', 'Performance by Cognitive Verb');
+            
+            doc.save(`exam-report-${student.lastName}-${student.firstName}-${new Date().toISOString().slice(0,10)}.pdf`);
+        }
+
+        generatePdfReportBtn.addEventListener('click', async () => {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'landscape' });
+            const analysisContainer = document.getElementById('analysis-section');
+            console.log('Generating PDF report... this may take a moment.');
+
+            doc.setFontSize(22);
+            doc.text('Exam Performance Analysis Report', 14, 20);
+            doc.setFontSize(12);
+            doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 28);
+            
+            let y = 40;
+
+            const addChartToPdf = async (chartWrapperId, title) => {
+                const chartWrapper = analysisContainer.querySelector(`#${chartWrapperId}`);
+                if (!chartWrapper || chartWrapper.clientHeight === 0) return;
+                
+                if (y > 180) { // Check if we need a new page
+                    doc.addPage();
+                    y = 20;
+                }
+
+                doc.setFontSize(16);
+                doc.text(title, 14, y);
+                y += 10;
+                
+                const canvas = await html2canvas(chartWrapper, { backgroundColor: '#1f2937', scale: 2 });
+                const imgData = canvas.toDataURL('image/png');
+                const imgProps = doc.getImageProperties(imgData);
+                const pdfWidth = doc.internal.pageSize.getWidth() - 28;
+                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                doc.addImage(imgData, 'PNG', 14, y, pdfWidth, pdfHeight);
+                y += pdfHeight + 10;
+            };
+
+            await addChartToPdf('classModuleChart-wrapper', 'Class Performance by Module');
+            await addChartToPdf('classContentChart-wrapper', 'Class Performance by Content Area');
+            await addChartToPdf('classOutcomeChart-wrapper', 'Class Performance by Syllabus Outcome');
+            await addChartToPdf('classVerbChart-wrapper', 'Class Performance by Cognitive Verb');
+            await addChartToPdf('classBandChart-wrapper', 'Class Performance Bands');
+            
+            doc.save(`exam-report-${new Date().toISOString().slice(0,10)}.pdf`);
+        });
+        
+        // --- INITIALIZATION ---
+        
+        // Finalize setup button moves from setup view to data entry view
+        finalizeSetupBtn.addEventListener('click', () => {
+            if (state.questions.length === 0) {
+                console.error("Please add at least one question to the exam structure.");
+                return;
+            }
+            setupSection.classList.add('hidden');
+            dataSection.classList.remove('hidden');
+            render();
+            debouncedAutoSave();
+        });
+
+        // Edit setup button returns to setup view
+        editSetupBtn.addEventListener('click', () => {
+            setupSection.classList.remove('hidden');
+            dataSection.classList.add('hidden');
+            render();
+            debouncedAutoSave();
+        });
+
+
+        // --- INITIAL LOAD ---
+        autoLoadState();
+        render();
+
+    </script>
+</body>
+</html>
+
