@@ -639,7 +639,7 @@
         function toggleLock(isLocked) {
             state.structureLocked = isLocked;
             const elementsToToggle = [
-                examStructureContainer, examBuilderBtn, saveTemplateBtn, loadTemplateBtn, lockStructureBtn
+                examStructureContainer, examBuilderBtn, saveTemplateBtn, loadTemplateBtn
             ];
             elementsToToggle.forEach(el => {
                 if(el) el.style.pointerEvents = isLocked ? 'none' : 'auto';
@@ -2359,3 +2359,4 @@
     </script>
 </body>
 </html>
+
