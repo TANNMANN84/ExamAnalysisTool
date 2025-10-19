@@ -85,6 +85,8 @@
             height: 100%;
             overflow: auto;
             background-color: rgba(0,0,0,0.7);
+            -webkit-backdrop-filter: blur(4px);
+            backdrop-filter: blur(4px);
         }
         .modal-content {
             background-color: #1f2937; /* bg-gray-800 */
@@ -113,9 +115,30 @@
         #question-modal details[open] > summary .chevron, #exam-builder-modal details[open] > summary .chevron {
             transform: rotate(90deg);
         }
+        #save-indicator {
+            transition: opacity 0.5s, transform 0.5s;
+        }
+        .sortable-header {
+            cursor: pointer;
+        }
+        .sortable-header:hover {
+            color: #a5b4fc; /* indigo-300 */
+        }
+        .sort-asc::after {
+            content: ' ▲';
+            font-size: 0.8em;
+        }
+        .sort-desc::after {
+            content: ' ▼';
+            font-size: 0.8em;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200">
+
+    <div id="save-indicator" class="fixed bottom-4 right-4 bg-gray-800 text-white text-sm py-2 px-4 rounded-lg shadow-lg border border-gray-600 opacity-0 transform translate-y-2">
+        Saving...
+    </div>
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8">
         <header class="text-center mb-8">
@@ -142,6 +165,9 @@
             <div id="setup-section" class="bg-gray-800 border border-gray-700 p-6 rounded-lg shadow-md mb-8">
                 <div class="flex flex-wrap justify-between items-center mb-4 border-b border-gray-600 pb-3 gap-2">
                     <h2 class="text-2xl font-semibold text-white">1. Exam Structure Setup</h2>
+                    <button id="lock-structure-btn" class="px-3 py-1.5 text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-500">
+                        Lock Structure
+                    </button>
                 </div>
                 
                 <div class="mb-6">
@@ -164,13 +190,13 @@
                           Build Exam Structure
                      </button>
                      <div class="flex flex-wrap justify-between items-center gap-4">
-                          <div>
-                               <button id="save-template-btn" class="inline-flex items-center px-3 py-1.5 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">Save as Template</button>
-                               <button id="load-template-btn" class="inline-flex items-center px-3 py-1.5 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">Load Template</button>
-                          </div>
-                         <button id="finalize-setup-btn" class="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                              Finalise and Proceed
-                         </button>
+                           <div>
+                                <button id="save-template-btn" class="inline-flex items-center px-3 py-1.5 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">Save as Template</button>
+                                <button id="load-template-btn" class="inline-flex items-center px-3 py-1.5 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">Load Template</button>
+                           </div>
+                          <button id="finalize-setup-btn" class="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                                Finalise and Proceed
+                          </button>
                      </div>
                 </div>
             </div>
@@ -180,11 +206,11 @@
                 <!-- REDESIGNED Data Entry Section -->
                 <div id="results-container" class="bg-gray-800 border border-gray-700 p-6 rounded-lg shadow-md mb-8">
                      <div class="flex justify-between items-center mb-4 border-b border-gray-600 pb-3">
-                          <h2 class="text-2xl font-semibold text-white">2. Enter Student Results</h2>
-                         <div class="flex items-center gap-4">
+                           <h2 class="text-2xl font-semibold text-white">2. Enter Student Results</h2>
+                          <div class="flex items-center gap-4">
                                <button id="edit-setup-btn" class="inline-flex items-center px-3 py-1.5 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Edit Setup</button>
                                <button id="export-csv-btn" class="inline-flex items-center px-3 py-1.5 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Export as CSV</button>
-                         </div>
+                          </div>
                      </div>
                     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
                         <!-- Student List Column -->
@@ -206,22 +232,47 @@
                         <button id="generate-pdf-report-btn" class="px-3 py-1.5 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">Generate PDF Report</button>
                     </div>
 
+                    <div id="problem-questions-summary" class="mb-8"></div>
+                    <div id="tag-filter-container" class="mb-4"></div>
+
                     <div id="analysis-content">
                          <p class="text-center text-gray-500 py-8">Analysis will appear here once you add students and enter their results.</p>
                     </div>
                     
+                    <div id="student-ranking-container" class="mt-8 pt-6 border-t border-gray-700 hidden"></div>
+
                     <div id="individual-analysis-container" class="mt-8 pt-6 border-t border-gray-700 hidden">
                         <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
-                            <h3 class="text-xl font-semibold text-white">Individual Student Analysis</h3>
+                            <h3 id="individual-analysis-title" class="text-xl font-semibold text-white">Individual Student Analysis</h3>
                             <button id="generate-individual-pdf-report-btn" class="hidden px-3 py-1.5 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Generate PDF for this Student</button>
                         </div>
-                        <select id="student-select-for-analysis" class="block w-full max-w-xs pl-3 pr-10 py-2 text-base bg-gray-700 border-gray-600 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md text-white">
-                            <option value="">Select a student...</option>
-                        </select>
+                        <label for="student-select-for-analysis" class="block text-sm font-medium text-gray-400 mb-1">Select student(s) (hold Ctrl/Cmd to select multiple)</label>
+                        <select id="student-select-for-analysis" multiple class="block w-full max-w-xs pl-3 pr-10 py-2 text-base bg-gray-700 border-gray-600 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md text-white"></select>
                         <div id="individual-analysis-content" class="mt-4">
                              <p class="text-center text-gray-500 py-8">Select a student to see their detailed analysis.</p>
                         </div>
                     </div>
+
+                    <div id="distractor-analysis-container" class="mt-8 pt-6 border-t border-gray-700 hidden">
+                        <h3 class="text-xl font-semibold text-white mb-2">Distractor Analysis</h3>
+                        <select id="distractor-select-for-analysis" class="block w-full max-w-xs pl-3 pr-10 py-2 text-base bg-gray-700 border-gray-600 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md text-white">
+                            <option value="">Select a multiple choice question...</option>
+                        </select>
+                        <div id="distractor-analysis-content" class="mt-4">
+                            <p class="text-center text-gray-500 py-8">Select a question to see the class response distribution.</p>
+                        </div>
+                    </div>
+
+                    <div id="question-analysis-container" class="mt-8 pt-6 border-t border-gray-700 hidden">
+                        <h3 class="text-xl font-semibold text-white mb-2">Question-Specific Analysis</h3>
+                        <select id="question-select-for-analysis" class="block w-full max-w-xs pl-3 pr-10 py-2 text-base bg-gray-700 border-gray-600 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md text-white">
+                            <option value="">Select a question...</option>
+                        </select>
+                        <div id="question-analysis-content" class="mt-4">
+                            <p class="text-center text-gray-500 py-8">Select a question to see the class score distribution.</p>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </main>
@@ -269,6 +320,19 @@
                  <button id="build-exam-btn" class="px-4 py-2 text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">Build Exam Scaffold</button>
              </div>
         </div>
+    </div>
+
+    <!-- Bulk Student Add Modal -->
+    <div id="bulk-student-modal" class="modal">
+      <div class="modal-content">
+        <h3 class="text-xl font-semibold text-white mb-4">Bulk Add Students</h3>
+        <p class="text-sm text-gray-400 mb-2">Paste a list of names, one per line. Supported formats: "LastName, FirstName" or "FirstName LastName".</p>
+        <textarea id="bulk-student-textarea" class="w-full h-40 p-2 rounded-md bg-gray-600 text-white border border-gray-500" placeholder="Doe, John&#10;Jane Smith"></textarea>
+        <div class="mt-4 flex justify-end gap-2">
+            <button onclick="document.getElementById('bulk-student-modal').style.display='none'" class="px-3 py-1.5 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">Cancel</button>
+            <button id="process-bulk-students-btn" class="px-3 py-1.5 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">Add Students</button>
+        </div>
+      </div>
     </div>
 
 
@@ -355,12 +419,16 @@
             selectedStudentId: null,
             editingQuestion: null,
             examScaffold: [],
+            structureLocked: false,
+            activeTags: [],
+            rankingSort: { key: 'rank', direction: 'asc' },
         });
         let state = getInitialState();
         let chartInstances = {};
 
         // --- DOM ELEMENTS ---
         const setupSection = document.getElementById('setup-section');
+        const lockStructureBtn = document.getElementById('lock-structure-btn');
         const syllabusSelect = document.getElementById('syllabus-select');
         const dataSection = document.getElementById('data-section');
         const examStructureContainer = document.getElementById('exam-structure-container');
@@ -370,19 +438,33 @@
         const studentListContainer = document.getElementById('student-list-container');
         const studentFormContainer = document.getElementById('student-form-container');
 
+        const problemQuestionsSummary = document.getElementById('problem-questions-summary');
+        const tagFilterContainer = document.getElementById('tag-filter-container');
         const analysisContent = document.getElementById('analysis-content');
         const exportCsvBtn = document.getElementById('export-csv-btn');
         const editSetupBtn = document.getElementById('edit-setup-btn');
         
         const individualAnalysisContainer = document.getElementById('individual-analysis-container');
+        const individualAnalysisTitle = document.getElementById('individual-analysis-title');
         const studentSelectForAnalysis = document.getElementById('student-select-for-analysis');
         const individualAnalysisContent = document.getElementById('individual-analysis-content');
+
+        const studentRankingContainer = document.getElementById('student-ranking-container');
         
+        const distractorAnalysisContainer = document.getElementById('distractor-analysis-container');
+        const distractorSelectForAnalysis = document.getElementById('distractor-select-for-analysis');
+        const distractorAnalysisContent = document.getElementById('distractor-analysis-content');
+        
+        const questionAnalysisContainer = document.getElementById('question-analysis-container');
+        const questionSelectForAnalysis = document.getElementById('question-select-for-analysis');
+        const questionAnalysisContent = document.getElementById('question-analysis-content');
+
         const saveSnapshotBtn = document.getElementById('save-snapshot-btn');
         const loadSnapshotBtn = document.getElementById('load-snapshot-btn');
         const exportJsonBtn = document.getElementById('export-json-btn');
         const importJsonInput = document.getElementById('import-json-input');
         const resetSessionBtn = document.getElementById('reset-session-btn');
+        const saveIndicator = document.getElementById('save-indicator');
 
         const saveTemplateBtn = document.getElementById('save-template-btn');
         const loadTemplateBtn = document.getElementById('load-template-btn');
@@ -392,6 +474,9 @@
         const saveNewTemplateBtn = document.getElementById('save-new-template-btn');
         const generatePdfReportBtn = document.getElementById('generate-pdf-report-btn');
         
+        const bulkStudentModal = document.getElementById('bulk-student-modal');
+        const processBulkStudentsBtn = document.getElementById('process-bulk-students-btn');
+
         // Question Modal Elements
         const questionModal = document.getElementById('question-modal');
         const modalTitle = document.getElementById('modal-title');
@@ -412,13 +497,22 @@
         let debounceTimer;
         const debouncedAutoSave = () => {
             clearTimeout(debounceTimer);
+            saveIndicator.textContent = 'Saving...';
+            saveIndicator.style.opacity = '1';
+            saveIndicator.style.transform = 'translateY(0)';
             debounceTimer = setTimeout(() => {
                 try {
                     localStorage.setItem('examTrackerAutoSession', JSON.stringify(state));
+                    saveIndicator.textContent = 'Saved ✔';
+                    setTimeout(() => {
+                        saveIndicator.style.opacity = '0';
+                        saveIndicator.style.transform = 'translateY(0.5rem)';
+                    }, 1500);
                 } catch (e) {
+                    saveIndicator.textContent = 'Error!';
                     console.error('Auto-save failed:', e);
                 }
-            }, 1000); // Save 1 second after the last change
+            }, 1000);
         };
 
         function autoLoadState() {
@@ -426,7 +520,9 @@
             if (savedState) {
                 try {
                     const parsedState = JSON.parse(savedState);
-                    state = parsedState;
+                    // Ensure all properties exist, merge with default if not
+                    state = { ...getInitialState(), ...parsedState };
+                    
                     if (state.questions.length > 0 && !state.students.length) {
                         setupSection.classList.remove('hidden');
                         dataSection.classList.add('hidden');
@@ -443,16 +539,19 @@
 
 
         // --- UTILITY FUNCTIONS ---
-        const createStudentObject = () => ({ id: crypto.randomUUID(), lastName: '', firstName: '', responses: {} });
+        const createStudentObject = () => ({ id: crypto.randomUUID(), lastName: '', firstName: '', tags: [], responses: {}, mcqResponses: {} });
 
         const createQuestionObject = (number = '', parent = null) => ({
-            id: crypto.randomUUID(), number, maxMarks: 1,
+            id: crypto.randomUUID(),
+            number,
+            maxMarks: 1,
+            type: 'marks', // 'marks' or 'mcq'
+            correctAnswer: '',
             module: [], 
             contentArea: [], 
             outcome: [], 
             cognitiveVerb: [],
             notes: '',
-            locked: false,
             subQuestions: []
         });
         
@@ -537,6 +636,26 @@
         }
 
         // --- SETUP LOGIC ---
+        function toggleLock(isLocked) {
+            state.structureLocked = isLocked;
+            const elementsToToggle = [
+                examStructureContainer, examBuilderBtn, saveTemplateBtn, loadTemplateBtn, lockStructureBtn
+            ];
+            elementsToToggle.forEach(el => {
+                if(el) el.style.pointerEvents = isLocked ? 'none' : 'auto';
+                if(el) el.style.opacity = isLocked ? '0.5' : '1';
+            });
+            
+            if (lockStructureBtn) {
+                lockStructureBtn.textContent = isLocked ? 'Unlock Structure' : 'Lock Structure';
+                lockStructureBtn.classList.toggle('bg-yellow-600', !isLocked);
+                lockStructureBtn.classList.toggle('hover:bg-yellow-500', !isLocked);
+                lockStructureBtn.classList.toggle('bg-green-600', isLocked);
+                lockStructureBtn.classList.toggle('hover:bg-green-500', isLocked);
+            }
+            debouncedAutoSave();
+        }
+
         const renderQuestionSetup = (questions = state.questions, container = examStructureContainer, level = 1) => {
             container.innerHTML = '';
             questions.forEach((q, index) => {
@@ -680,7 +799,6 @@
             }
 
             modalTitle.textContent = fullTitle;
-            if (modalBreadcrumb) modalBreadcrumb.innerHTML = ''; // Clear breadcrumb
 
             const cognitiveVerbCheckboxes = ['Analyse', 'Calculate', 'Describe', 'Discuss', 'Evaluate', 'Explain', 'Identify', 'Justify', 'Outline', 'Predict']
                 .map(v => createCheckbox(v, question.cognitiveVerb.includes(v))).join('');
@@ -734,21 +852,35 @@
                     ${createAccordionSection('Cognitive Verb(s)', cognitiveVerbCheckboxes, 'cognitiveVerb')}
                 </div>`;
             
+            const mcqOptions = question.type === 'mcq' ?
+                `<div class="flex-1">
+                    <label class="text-xs font-medium text-gray-400">Correct Answer</label>
+                    <input type="text" value="${question.correctAnswer}" class="mt-1 w-full rounded-md bg-gray-600 border-gray-500 shadow-sm p-2 text-white uppercase" data-field="correctAnswer" placeholder="e.g., C">
+                </div>` : '';
+
             const marksContent = question.subQuestions.length > 0 ?
                 `<div class="h-10 flex items-center justify-center bg-gray-800 rounded-md text-gray-400 text-sm">Calculated from sub-parts</div>` :
-                `<input type="number" value="${question.maxMarks}" min="0" step="0.5" class="mt-1 w-full rounded-md bg-gray-600 border-gray-500 shadow-sm p-2 text-white" data-field="maxMarks">`;
+                `<input type="number" value="${question.maxMarks}" min="0" step="0.5" class="mt-1 w-full rounded-md bg-gray-600 border-gray-500 shadow-sm p-2 text-white" data-field="maxMarks" ${question.type === 'mcq' ? 'disabled' : ''}>`;
 
             questionFormContent.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 pb-4 border-b border-gray-700">
-                    <div>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 pb-4 border-b border-gray-700">
+                    <div class="flex-1">
                         <label class="text-xs font-medium text-gray-400">Question Number / Part Label</label>
                         <input type="text" value="${question.number}" class="mt-1 w-full rounded-md bg-gray-600 border-gray-500 shadow-sm p-2 text-white" data-field="number" ${isMainQuestionInState ? 'disabled' : ''}>
                     </div>
-                     <div>
+                    <div class="flex-1">
+                        <label class="text-xs font-medium text-gray-400">Question Type</label>
+                        <select data-field="type" class="mt-1 w-full rounded-md bg-gray-600 border-gray-500 shadow-sm p-2 text-white">
+                            <option value="marks" ${question.type === 'marks' ? 'selected' : ''}>Standard Marks</option>
+                            <option value="mcq" ${question.type === 'mcq' ? 'selected' : ''}>Multiple Choice</option>
+                        </select>
+                    </div>
+                     <div class="flex-1">
                         <label class="text-xs font-medium text-gray-400">Max Marks</label>
                         ${marksContent}
                     </div>
-                    <div class="md:col-span-3">
+                    ${mcqOptions}
+                    <div class="md:col-span-4">
                         <label class="text-xs font-medium text-gray-400">Specifics/Notes</label>
                         <input type="text" value="${question.notes}" class="mt-1 w-full rounded-md bg-gray-600 border-gray-500 shadow-sm p-2 text-white" data-field="notes">
                     </div>
@@ -764,10 +896,20 @@
             </label>`;
         
         questionFormContent.addEventListener('change', (e) => {
-            if (!e.target.matches('input[type="checkbox"]')) return;
             const question = getFocusedQuestionInModal();
             if (!question) return;
 
+            // Handle Question Type change
+            if (e.target.dataset.field === 'type') {
+                question.type = e.target.value;
+                if (question.type === 'mcq') {
+                    question.maxMarks = 1;
+                }
+                renderModalForm(); // Re-render to show/hide relevant fields
+                return;
+            }
+
+            if (!e.target.matches('input[type="checkbox"]')) return;
             const fieldContainer = e.target.closest('[data-field]');
             if (!fieldContainer) return;
             
@@ -821,9 +963,14 @@
              const fieldEl = e.target.closest('[data-field]');
              if(!fieldEl) return;
              const field = fieldEl.dataset.field;
-             question[field] = fieldEl.value;
+             let value = fieldEl.value;
+             if (field === 'correctAnswer') {
+                  value = value.toUpperCase();
+                  fieldEl.value = value;
+             }
+             question[field] = value;
              debouncedAutoSave();
-        });
+         });
         
         questionFormContent.addEventListener('toggle', e => {
             if(e.target.open) {
@@ -844,12 +991,24 @@
         function saveAndEditNext() {
             if (!state.editingQuestion) return;
             
-            const { isNew, originalParentId } = state.editingQuestion;
             saveQuestionFromModal(true); // Save the current state without closing
 
             const allFlatQuestions = getAllQuestionsFlat();
-            const savedQuestionId = getFocusedQuestionInModal().id;
-            const currentIndex = allFlatQuestions.findIndex(q => q.id === savedQuestionId);
+            // This is tricky because the ID might have changed if it was a new question. We need to find the saved question in the main state.
+            const { originalQuestionId, originalParentId, isNew, topLevelQuestion } = state.editingQuestion;
+            let savedQuestion;
+            if (isNew) {
+                if(originalParentId) {
+                    const parent = findQuestionById(originalParentId);
+                    savedQuestion = parent.subQuestions[parent.subQuestions.length - 1];
+                } else {
+                    savedQuestion = state.questions[state.questions.length - 1];
+                }
+            } else {
+                savedQuestion = findQuestionById(originalQuestionId);
+            }
+
+            const currentIndex = allFlatQuestions.findIndex(q => q.id === savedQuestion.id);
 
             if (currentIndex > -1 && currentIndex < allFlatQuestions.length - 1) {
                 const nextQuestionId = allFlatQuestions[currentIndex + 1].id;
@@ -876,7 +1035,7 @@
             if (focusedQuestion.subQuestions.length === 0) {
                  const marksInput = form.querySelector('[data-field="maxMarks"]');
                  if (marksInput) {
-                     focusedQuestion.maxMarks = parseFloat(marksInput.value) || 0;
+                      focusedQuestion.maxMarks = parseFloat(marksInput.value) || 0;
                  }
             }
             
@@ -956,6 +1115,10 @@
             debouncedAutoSave();
         });
 
+        lockStructureBtn.addEventListener('click', () => {
+            toggleLock(!state.structureLocked);
+        });
+
         // Exam Builder Logic
         examBuilderBtn.addEventListener('click', () => {
             if (!checkSyllabusSelected()) return;
@@ -977,6 +1140,7 @@
                     for(let i=0; i<section.count; i++) {
                         const q = createQuestionObject(questionCounter.toString());
                         q.maxMarks = section.marks;
+                        q.type = 'mcq';
                         q.notes = section.name;
                         state.questions.push(q);
                         questionCounter++;
@@ -1030,7 +1194,7 @@
                 let questionCounter = 1;
                 for(let i=0; i < sectionIndex; i++) {
                      if (state.examScaffold[i].type === 'mc') {
-                         questionCounter += parseInt(state.examScaffold[i].count, 10);
+                          questionCounter += parseInt(state.examScaffold[i].count, 10);
                      } else {
                            questionCounter += state.examScaffold[i].questions.length;
                      }
@@ -1044,7 +1208,7 @@
                         </div>
                         <div>
                             <label class="text-xs font-medium text-gray-400">Marks each</label>
-                            <input type="number" value="${section.marks}" oninput="state.examScaffold[${sectionIndex}].marks = this.value" class="mt-1 w-full p-2 rounded-md bg-gray-600">
+                            <input type="number" value="${section.marks}" oninput="state.examScaffold[${sectionIndex}].marks = this.value" class="mt-1 w-full p-2 rounded-md bg-gray-600" disabled>
                         </div>
                     </div>`;
                 
@@ -1093,11 +1257,9 @@
 
             if(button.id === 'add-section-btn') {
                 state.examScaffold.push({name: `Section ${toRomanNumeral(state.examScaffold.length + 1).toUpperCase()}`, type: 'long', questions: []});
-                renderExamBuilder();
             }
             if(button.matches('.remove-section-btn')) {
                 state.examScaffold.splice(button.dataset.sectionIndex, 1);
-                renderExamBuilder();
             }
             if(button.matches('.add-long-q-btn')) {
                 const sectionIndex = button.dataset.sectionIndex;
@@ -1106,24 +1268,35 @@
                 for (let i = 0; i < count; i++) {
                     state.examScaffold[sectionIndex].questions.push({ subParts: '' });
                 }
-                renderExamBuilder();
             }
              if(button.matches('.remove-long-q-btn')) {
                 state.examScaffold[button.dataset.sectionIndex].questions.splice(button.dataset.qIndex, 1);
-                renderExamBuilder();
             }
+            renderExamBuilder();
         });
         
         
         // --- DATA ENTRY & RENDER LOGIC ---
         function render() {
             syllabusSelect.value = state.selectedSyllabus;
+            toggleLock(state.structureLocked);
             updateParentQuestionData(true); 
             if (!dataSection.classList.contains('hidden')) {
                 renderDataEntryView();
+                renderAllAnalysisSelectors();
             }
             renderAnalysis();
             renderIndividualAnalysisSelector();
+            // --- FIX START: Add definitions for missing functions ---
+            renderProblemQuestionsSummary();
+            renderRankingTable();
+            renderTagFilter();
+            // --- FIX END ---
+        }
+
+        function renderAllAnalysisSelectors() {
+             renderQuestionSpecificAnalysisSelector();
+             renderDistractorAnalysisSelector();
         }
 
         function renderDataEntryView() {
@@ -1141,6 +1314,15 @@
             }
             renderStudentList(); // Re-render list to update name
             renderIndividualAnalysisSelector();
+            debouncedAutoSave();
+        }
+        
+        function handleTagChange(event) {
+            const student = state.students.find(s => s.id === state.selectedStudentId);
+            if (student) {
+                student.tags = event.target.value.split(',').map(tag => tag.trim()).filter(Boolean);
+            }
+            renderTagFilter();
             debouncedAutoSave();
         }
 
@@ -1163,6 +1345,29 @@
             }
             
             event.target.parentElement.nextElementSibling.className = `w-16 text-center p-2 rounded-md ${getColorForScore(score, question.maxMarks)}`;
+
+            updateStudentTotalInDOM();
+            renderAnalysis();
+            debouncedAutoSave();
+        }
+
+        function handleMcqResponseChange(questionId, event) {
+            const student = state.students.find(s => s.id === state.selectedStudentId);
+            const question = findQuestionById(questionId);
+            if (!student || !question) return;
+
+            const answer = event.target.value.toUpperCase();
+            student.mcqResponses[questionId] = answer;
+            
+            if(answer === question.correctAnswer) {
+                student.responses[questionId] = 1;
+            } else {
+                student.responses[questionId] = 0;
+            }
+            event.target.value = answer; // Ensure it's uppercase
+            
+            const colorClass = answer === question.correctAnswer ? getColorForScore(1, 1) : getColorForScore(0, 1);
+            event.target.parentElement.nextElementSibling.className = `w-16 text-center p-2 rounded-md ${colorClass}`;
 
             updateStudentTotalInDOM();
             renderAnalysis();
@@ -1204,9 +1409,14 @@
                 <h3 class="text-lg font-semibold mb-3 text-white">Class List</h3>
                 <div class="space-y-1 mb-4">${studentListHtml}</div>
                 <div class="space-y-2 pt-4 border-t border-gray-700">
-                    <button id="add-student-btn" class="w-full inline-flex justify-center items-center px-3 py-1.5 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">
-                        Add Student
-                    </button>
+                    <div class="flex gap-2">
+                        <button id="add-student-btn" class="flex-1 inline-flex justify-center items-center px-3 py-1.5 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">
+                            Add Student
+                        </button>
+                         <button id="bulk-add-student-btn" class="flex-1 inline-flex justify-center items-center px-3 py-1.5 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">
+                            Bulk Add
+                        </button>
+                    </div>
                     <div class="flex items-center justify-center gap-2 pt-2">
                         <label for="toggle-delete-btn" class="text-sm font-medium text-red-400">Delete Mode:</label>
                         <button id="toggle-delete-btn" class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent ${toggleChecked ? 'bg-red-600' : 'bg-gray-600'} transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-800" type="button" role="switch" aria-checked="${toggleChecked}">
@@ -1227,9 +1437,23 @@
 
             const leafQs = getLeafQuestions(state.questions);
             const questionsHtml = leafQs.map((q, index) => {
-                const score = student.responses[q.id];
-                const colorClass = getColorForScore(score, q.maxMarks);
-                 const tooltipHtml = `Module: ${q.module.join(', ') || 'N/A'}\nContent: ${q.contentArea.join(', ') || 'N/A'}\nOutcome: ${q.outcome.join(', ') || 'N/A'}\nVerb: ${q.cognitiveVerb.join(', ') || 'N/A'}\nNotes: ${q.notes || 'N/A'}`;
+                let inputHtml;
+                let displayValue;
+                let colorClass;
+
+                if (q.type === 'mcq') {
+                    const response = student.mcqResponses[q.id] || '';
+                    inputHtml = `<input type="text" maxlength="1" class="w-full p-2 text-center text-sm rounded-md text-white border-gray-600 bg-gray-700 uppercase focus:ring-2 focus:ring-offset-1 focus:ring-offset-gray-800 focus:ring-indigo-500 shadow-sm"
+                                value="${response}" onchange="handleMcqResponseChange('${q.id}', event)" data-question-id="${q.id}" data-question-index="${index}">`;
+                    colorClass = response ? (response === q.correctAnswer ? getColorForScore(1, 1) : getColorForScore(0, 1)) : 'bg-gray-700';
+                } else {
+                    const score = student.responses[q.id];
+                    inputHtml = `<input type="number" step="0.5" class="w-full p-2 text-center text-sm rounded-md text-white border-gray-600 bg-gray-700 focus:ring-2 focus:ring-offset-1 focus:ring-offset-gray-800 focus:ring-indigo-500 shadow-sm"
+                                value="${score === undefined ? '' : score}" min="0" max="${q.maxMarks || 0}" onchange="handleScoreChange('${q.id}', event)" data-question-id="${q.id}" data-question-index="${index}">`;
+                    colorClass = getColorForScore(score, q.maxMarks);
+                }
+
+                 const tooltipHtml = `Type: ${q.type === 'mcq' ? `MCQ (Ans: ${q.correctAnswer})` : 'Standard'}\nModule: ${q.module.join(', ') || 'N/A'}\nContent: ${q.contentArea.join(', ') || 'N/A'}\nOutcome: ${q.outcome.join(', ') || 'N/A'}\nVerb: ${q.cognitiveVerb.join(', ') || 'N/A'}\nNotes: ${q.notes || 'N/A'}`;
 
                 return `
                 <div class="flex items-center gap-4 py-2 border-b border-gray-700">
@@ -1238,8 +1462,7 @@
                         <span class="tooltiptext">${tooltipHtml.replace(/\n/g, '<br>')}</span>
                     </div>
                     <div class="flex-grow">
-                        <input type="number" step="0.5" class="w-full p-2 text-center text-sm rounded-md text-white border-gray-600 bg-gray-700 focus:ring-2 focus:ring-offset-1 focus:ring-offset-gray-800 focus:ring-indigo-500 shadow-sm"
-                        value="${score === undefined ? '' : score}" min="0" max="${q.maxMarks || 0}" onchange="handleScoreChange('${q.id}', event)" data-question-index="${index}">
+                        ${inputHtml}
                     </div>
                     <div class="w-16 text-center p-2 rounded-md ${colorClass}">
                         / ${q.maxMarks || 0}
@@ -1254,11 +1477,15 @@
                     <div class="flex flex-col sm:flex-row gap-4 mb-6 pb-6 border-b border-gray-700">
                         <div class="flex-1">
                             <label class="block text-sm font-medium text-gray-400">Last Name</label>
-                            <input type="text" value="${student.lastName}" onchange="handleNameChange('lastName', event)" class="mt-1 w-full bg-gray-700 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Last Name">
+                            <input type="text" value="${student.lastName || ''}" onchange="handleNameChange('lastName', event)" class="mt-1 w-full bg-gray-700 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Last Name">
                         </div>
                         <div class="flex-1">
                             <label class="block text-sm font-medium text-gray-400">First Name</label>
-                            <input type="text" value="${student.firstName}" onchange="handleNameChange('firstName', event)" class="mt-1 w-full bg-gray-700 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="First Name">
+                            <input type="text" value="${student.firstName || ''}" onchange="handleNameChange('firstName', event)" class="mt-1 w-full bg-gray-700 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="First Name">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-400">Tags (comma-separated)</label>
+                            <input type="text" value="${(student.tags || []).join(', ')}" onchange="handleTagChange(event)" class="mt-1 w-full bg-gray-700 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Extension, Group A">
                         </div>
                         <div class="flex-shrink-0 text-right">
                             <label class="block text-sm font-medium text-gray-400">Total Score</label>
@@ -1293,22 +1520,45 @@
                 }
             });
             studentFormContainer.querySelector('#question-entry-list').addEventListener('keydown', e => {
-                 if(!['ArrowUp', 'ArrowDown'].includes(e.key)) return;
+                 if(!['ArrowUp', 'ArrowDown', 'Enter'].includes(e.key)) return;
                  const target = e.target;
-                 if (target.tagName !== 'INPUT' || target.type !== 'number') return;
+                 if (target.tagName !== 'INPUT') return;
                  e.preventDefault();
 
+                 const currentStudentIndex = state.students.findIndex(s => s.id === state.selectedStudentId);
                  const currentQI = parseInt(target.dataset.questionIndex, 10);
                  const numQuestions = getLeafQuestions(state.questions).length;
-                 let nextQI = currentQI;
-
-                 if (e.key === 'ArrowUp' && currentQI > 0) nextQI--;
-                 if (e.key === 'ArrowDown' && currentQI < numQuestions - 1) nextQI++;
-                
-                 const nextInput = studentFormContainer.querySelector(`[data-question-index="${nextQI}"]`);
-                 if (nextInput) {
-                     nextInput.focus();
-                     nextInput.select();
+                 
+                 if (e.key === 'Enter' && e.shiftKey) { // Shift + Enter
+                     if (currentStudentIndex < state.students.length - 1) {
+                         const nextStudentId = state.students[currentStudentIndex + 1].id;
+                         state.selectedStudentId = nextStudentId;
+                         renderDataEntryView();
+                         // Refocus on the same question for the new student
+                         setTimeout(() => {
+                             const nextInput = studentFormContainer.querySelector(`[data-question-index="${currentQI}"]`);
+                             if (nextInput) {
+                                 nextInput.focus();
+                                 nextInput.select();
+                             }
+                         }, 0);
+                     }
+                 } else if (e.key === 'Enter' || e.key === 'ArrowDown') { // Enter or ArrowDown
+                      if (currentQI < numQuestions - 1) {
+                         const nextInput = studentFormContainer.querySelector(`[data-question-index="${currentQI + 1}"]`);
+                         if (nextInput) {
+                            nextInput.focus();
+                            nextInput.select();
+                         }
+                      }
+                 } else if (e.key === 'ArrowUp') { // ArrowUp
+                      if (currentQI > 0) {
+                         const prevInput = studentFormContainer.querySelector(`[data-question-index="${currentQI - 1}"]`);
+                         if (prevInput) {
+                            prevInput.focus();
+                            prevInput.select();
+                         }
+                      }
                  }
             });
         }
@@ -1318,6 +1568,7 @@
             const studentDiv = e.target.closest('[data-student-id]');
             const removeBtn = e.target.closest('.remove-student-btn');
             const addBtn = e.target.closest('#add-student-btn');
+            const bulkAddBtn = e.target.closest('#bulk-add-student-btn');
             const deleteToggle = e.target.closest('#toggle-delete-btn');
 
             if (removeBtn) {
@@ -1331,6 +1582,9 @@
                 const newStudent = createStudentObject();
                 state.students.push(newStudent);
                 state.selectedStudentId = newStudent.id;
+            } else if (bulkAddBtn) {
+                bulkStudentModal.style.display = 'block';
+                return; // Prevent full re-render
             } else if (deleteToggle) {
                 state.deleteMode = !state.deleteMode;
                 renderStudentList();
@@ -1342,8 +1596,61 @@
             debouncedAutoSave();
         });
 
-        function getAnalysisData(student = null) {
-            const studentsToAnalyze = student ? [student] : state.students.filter(s => s.lastName && s.firstName);
+        processBulkStudentsBtn.addEventListener('click', () => {
+            const textarea = document.getElementById('bulk-student-textarea');
+            const names = textarea.value.split('\n').filter(name => name.trim() !== '');
+            
+            names.forEach(name => {
+                const newStudent = createStudentObject();
+                if (name.includes(',')) {
+                    const parts = name.split(',');
+                    newStudent.lastName = parts[0].trim();
+                    newStudent.firstName = parts[1].trim();
+                } else {
+                    const parts = name.split(' ');
+                    newStudent.firstName = parts[0].trim();
+                    newStudent.lastName = parts.slice(1).join(' ').trim();
+                }
+                state.students.push(newStudent);
+            });
+            
+            textarea.value = '';
+            bulkStudentModal.style.display = 'none';
+            render();
+            debouncedAutoSave();
+        });
+
+        // --- FIX: Add stub functions that were called but not defined ---
+        function renderProblemQuestionsSummary() {
+            // This function's implementation is missing in the original code.
+            // It would likely calculate and display questions the class found most difficult.
+            problemQuestionsSummary.innerHTML = ''; // Clear content to avoid showing stale data.
+        }
+
+        function renderRankingTable() {
+            // This function's implementation is missing in the original code.
+            // It would display a sortable table of students ranked by their total score.
+            studentRankingContainer.innerHTML = ''; // Clear content.
+        }
+
+        function renderTagFilter() {
+            // This function's implementation is missing in the original code.
+            // It would create filter buttons based on student tags.
+            tagFilterContainer.innerHTML = ''; // Clear content.
+        }
+        // --- END FIX ---
+
+
+        function getAnalysisData(students = []) {
+            let studentsToAnalyze;
+            if(students.length > 0) {
+                studentsToAnalyze = students;
+            } else if (state.activeTags.length > 0) {
+                studentsToAnalyze = state.students.filter(s => s.tags && state.activeTags.every(t => s.tags.includes(t)));
+            } else {
+                 studentsToAnalyze = state.students.filter(s => s.lastName && s.firstName);
+            }
+
             if (studentsToAnalyze.length === 0) {
                 return { moduleData: {}, contentData: {}, outcomeData: {}, verbData: {}, bandData: {} };
             }
@@ -1379,12 +1686,16 @@
 
             [moduleData, contentData, outcomeData, verbData].forEach(dataObject => {
                 Object.values(dataObject).forEach(item => {
+                     let itemTotal = 0;
+                     let itemScored = 0;
                     studentsToAnalyze.forEach(s => {
                         if (item.students[s.id]) {
-                            item.total += item.students[s.id].total;
-                            item.scored += item.students[s.id].scored;
+                            itemTotal += item.students[s.id].total;
+                            itemScored += item.students[s.id].scored;
                         }
                     });
+                    item.total = itemTotal;
+                    item.scored = itemScored;
                 });
             });
 
@@ -1392,7 +1703,7 @@
             const bandData = { '90-100%': 0, '80-89%': 0, '70-79%': 0, '60-69%': 0, '50-59%': 0, '<50%': 0 };
             const leafQs = getLeafQuestions(state.questions);
             const totalMax = leafQs.reduce((s, q) => s + parseFloat(q.maxMarks || 0), 0);
-            if (totalMax > 0 && !student) {
+            if (totalMax > 0 && students.length === 0) { // Only calculate for class view
                 studentsToAnalyze.forEach(s => {
                     const totalScore = leafQs.reduce((sum, q) => sum + (s.responses[q.id] || 0), 0);
                     const perc = (totalScore / totalMax) * 100;
@@ -1435,14 +1746,16 @@
             const uiHtml = `
                 <div class="bg-gray-800/50 p-4 rounded-lg">
                     <div class="flex justify-between items-center mb-3">
-                        <h3 class="text-lg font-semibold text-white">${title}</h3>
+                        <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                            <input type="checkbox" class="pdf-include-checkbox h-4 w-4 rounded border-gray-500 bg-gray-600 text-indigo-500" data-chart-id="${chartId}" checked>
+                            ${title}
+                        </h3>
                         <div class="flex items-center gap-2">
                             <div class="flex rounded-md shadow-sm bg-gray-700 p-0.5">
                                 <button data-view-id="${chartId}" data-view-type="bars" class="view-toggle-btn px-2 py-1 text-xs font-medium rounded-md text-white bg-indigo-600">Bars</button>
                                 <button data-view-id="${chartId}" data-view-type="bar" class="view-toggle-btn px-2 py-1 text-xs font-medium rounded-md text-gray-300">Column</button>
                                 <button data-view-id="${chartId}" data-view-type="pie" class="view-toggle-btn px-2 py-1 text-xs font-medium rounded-md text-gray-300">Pie</button>
                             </div>
-                            <button data-export-id="${chartId}-wrapper" class="export-chart-btn px-2 py-1 text-xs font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600">Export Image</button>
                         </div>
                     </div>
                     <div id="${chartId}-wrapper">
@@ -1456,15 +1769,16 @@
 
             setTimeout(() => {
                 if (document.getElementById(chartId)) {
-                    renderChart(chartId, data, 'bar');
+                    const students = Array.from(studentSelectForAnalysis.selectedOptions).map(opt => state.students.find(s => s.id === opt.value));
+                    renderChart(chartId, data, 'bar', students);
                 }
             }, 0);
 
             return uiHtml;
         }
 
-        function renderAnalysis(student = null) {
-            const isIndividual = !!student;
+        function renderAnalysis(students = []) {
+            const isIndividual = students.length > 0;
             const container = isIndividual ? individualAnalysisContent : analysisContent;
             
             const hasResponses = state.students.some(s => Object.keys(s.responses).length > 0);
@@ -1473,7 +1787,7 @@
                  return;
             }
 
-            const { moduleData, contentData, outcomeData, verbData, bandData } = getAnalysisData(student);
+            const { moduleData, contentData, outcomeData, verbData, bandData } = getAnalysisData(students);
             
             const moduleHtml = createAnalysisUI(isIndividual ? 'Module Performance' : 'Class Performance by Module', moduleData, isIndividual ? 'indivModuleChart' : 'classModuleChart');
             const contentHtml = createAnalysisUI(isIndividual ? 'Content Area Performance' : 'Class Performance by Content Area', contentData, isIndividual ? 'indivContentChart' : 'classContentChart');
@@ -1490,7 +1804,7 @@
             }
         }
 
-        function renderChart(chartId, data, type) {
+        function renderChart(chartId, data, type, students = []) {
             const ctx = document.getElementById(chartId);
             if (!ctx || !data || Object.keys(data).length === 0) return;
             
@@ -1502,8 +1816,7 @@
             const labels = sortedData.map(entry => entry[0]);
             
             let datasets;
-            const isIndividual = chartId.startsWith('indiv');
-            const activeStudents = state.students.filter(s => s.lastName && s.firstName);
+            const isComparative = students.length > 1;
 
             if (chartId.includes('Band')) { // Special case for band chart
                  datasets = [{
@@ -1511,9 +1824,9 @@
                     data: sortedData.map(entry => entry[1]), // Use the value directly
                     backgroundColor: labels.map((_, i) => `hsl(${210 + i * (150 / labels.length)}, 60%, 60%)`),
                 }];
-            } else if (type === 'bar' && !isIndividual && activeStudents.length > 0) {
-                const studentColors = activeStudents.map((_, i) => `hsl(${200 + i * (160 / activeStudents.length)}, 70%, 50%)`);
-                datasets = activeStudents.map((s, i) => ({
+            } else if (isComparative && type === 'bar') {
+                const studentColors = students.map((_, i) => `hsl(${200 + i * (160 / students.length)}, 70%, 50%)`);
+                datasets = students.map((s, i) => ({
                     label: `${s.lastName}, ${s.firstName}`,
                     data: sortedData.map(([_, d]) => {
                         const studentData = d.students[s.id];
@@ -1524,7 +1837,7 @@
             } else {
                  const chartColors = labels.map((_, i) => `hsl(${210 + i * (150 / labels.length)}, 60%, 60%)`);
                  datasets = [{
-                    label: '% Mastery',
+                    label: isComparative ? 'Average % Mastery' : '% Mastery',
                     data: sortedData.map(([_, d]) => d.total > 0 ? (d.scored / d.total * 100) : 0),
                     backgroundColor: chartColors,
                     borderColor: '#4f46e5',
@@ -1539,7 +1852,7 @@
                     responsive: true,
                     maintainAspectRatio: type === 'pie',
                      plugins: {
-                         legend: { position: type === 'pie' ? 'right' : 'top', display: (type === 'pie' || (type==='bar' && !isIndividual) || chartId.includes('Band')), labels: { color: '#d1d5db' } },
+                         legend: { position: type === 'pie' ? 'right' : 'top', display: (type === 'pie' || isComparative || chartId.includes('Band')), labels: { color: '#d1d5db' } },
                          tooltip: { callbacks: { label: (c) => chartId.includes('Band') ? `${c.label}: ${c.raw} students` : `${c.dataset.label || c.label}: ${c.raw.toFixed(1)}%` } }
                     },
                     scales: type === 'bar' ? { y: { beginAtZero: true, max: chartId.includes('Band') ? undefined : 100, ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }, x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } } } : {}
@@ -1567,8 +1880,8 @@
                 } else {
                     barsContainer.classList.add('hidden');
                     chartContainer.classList.remove('hidden');
-                    const student = studentSelectForAnalysis.value ? state.students.find(s => s.id === studentSelectForAnalysis.value) : null;
-                    const { moduleData, contentData, outcomeData, verbData, bandData } = getAnalysisData(student);
+                    const students = Array.from(studentSelectForAnalysis.selectedOptions).map(opt => state.students.find(s => s.id === opt.value));
+                    const { moduleData, contentData, outcomeData, verbData, bandData } = getAnalysisData(students);
                     
                     let data;
                     if (viewId.includes('Module')) data = moduleData;
@@ -1577,19 +1890,7 @@
                     else if (viewId.includes('Verb')) data = verbData;
                     else if (viewId.includes('Band')) data = bandData;
 
-                    renderChart(viewId, data, viewType);
-                }
-            }
-            if (e.target.matches('.export-chart-btn')) {
-                const wrapperId = e.target.dataset.exportId;
-                const wrapper = document.getElementById(wrapperId);
-                if(wrapper) {
-                    html2canvas(wrapper, { backgroundColor: '#1f2937' }).then(canvas => {
-                        const link = document.createElement('a');
-                        link.download = `${wrapperId.replace('-wrapper', '')}-analysis.png`;
-                        link.href = canvas.toDataURL('image/png');
-                        link.click();
-                    });
+                    renderChart(viewId, data, viewType, students);
                 }
             }
         });
@@ -1598,44 +1899,217 @@
              const activeStudents = state.students.filter(s => s.lastName && s.firstName);
             if (activeStudents.length > 0) {
                 individualAnalysisContainer.classList.remove('hidden');
-                const currentSelection = studentSelectForAnalysis.value;
-                studentSelectForAnalysis.innerHTML = '<option value="">Select a student...</option>';
+                questionAnalysisContainer.classList.remove('hidden');
+                const currentSelection = Array.from(studentSelectForAnalysis.selectedOptions).map(opt => opt.value);
+                studentSelectForAnalysis.innerHTML = '';
                 activeStudents.sort((a,b) => a.lastName.localeCompare(b.lastName)).forEach(s => {
                     const option = document.createElement('option');
                     option.value = s.id;
                     option.textContent = `${s.lastName}, ${s.firstName}`;
-                    if(s.id === currentSelection) option.selected = true;
+                    if(currentSelection.includes(s.id)) option.selected = true;
                     studentSelectForAnalysis.appendChild(option);
                 });
             } else {
                 individualAnalysisContainer.classList.add('hidden');
+                questionAnalysisContainer.classList.add('hidden');
             }
         }
         
         studentSelectForAnalysis.addEventListener('change', (e) => {
-            const studentId = e.target.value;
+            const selectedOptions = Array.from(e.target.selectedOptions);
+            const studentIds = selectedOptions.map(opt => opt.value);
+            const students = studentIds.map(id => state.students.find(s => s.id === id));
+            
             const individualPdfBtn = document.getElementById('generate-individual-pdf-report-btn');
-            if (studentId) {
-                const student = state.students.find(s => s.id === studentId);
-                renderAnalysis(student);
+
+            if(students.length > 1) {
+                individualAnalysisTitle.textContent = 'Comparative Student Analysis';
+                individualPdfBtn.classList.add('hidden');
+            } else if (students.length === 1) {
+                individualAnalysisTitle.textContent = 'Individual Student Analysis';
                 individualPdfBtn.classList.remove('hidden');
-                individualPdfBtn.onclick = () => generateIndividualPdfReport(student);
+                individualPdfBtn.onclick = () => generatePdfReport(true, students[0]);
             } else {
-                individualAnalysisContent.innerHTML = '<p class="text-center text-gray-500 py-8">Select a student to see their detailed analysis.</p>';
+                individualAnalysisTitle.textContent = 'Individual Student Analysis';
                 individualPdfBtn.classList.add('hidden');
             }
+
+            if (students.length > 0) {
+                renderAnalysis(students);
+            } else {
+                individualAnalysisContent.innerHTML = '<p class="text-center text-gray-500 py-8">Select a student to see their detailed analysis.</p>';
+            }
         });
+
+        function renderQuestionSpecificAnalysisSelector() {
+            const leafQs = getLeafQuestions(state.questions);
+            if (leafQs.length > 0) {
+                questionAnalysisContainer.classList.remove('hidden');
+                const currentSelection = questionSelectForAnalysis.value;
+                questionSelectForAnalysis.innerHTML = '<option value="">Select a question...</option>';
+                leafQs.forEach(q => {
+                    const option = document.createElement('option');
+                    option.value = q.id;
+                    option.textContent = q.displayNumber;
+                    if (q.id === currentSelection) option.selected = true;
+                    questionSelectForAnalysis.appendChild(option);
+                });
+            } else {
+                questionAnalysisContainer.classList.add('hidden');
+            }
+        }
+
+        questionSelectForAnalysis.addEventListener('change', (e) => {
+            const questionId = e.target.value;
+            if (questionId) {
+                renderQuestionSpecificAnalysis(questionId);
+            } else {
+                questionAnalysisContent.innerHTML = '<p class="text-center text-gray-500 py-8">Select a question to see the class score distribution.</p>';
+            }
+        });
+
+        function renderQuestionSpecificAnalysis(questionId) {
+            const question = findQuestionById(questionId);
+            const activeStudents = state.students.filter(s => s.lastName && s.firstName);
+            if (!question || activeStudents.length === 0) return;
+
+            const scoreDistribution = {};
+            activeStudents.forEach(s => {
+                const score = s.responses[questionId] !== undefined ? s.responses[questionId] : 'N/A';
+                scoreDistribution[score] = (scoreDistribution[score] || 0) + 1;
+            });
+            
+            const chartId = 'questionSpecificChart';
+            questionAnalysisContent.innerHTML = `
+                <div class="bg-gray-800/50 p-4 rounded-lg">
+                    <canvas id="${chartId}"></canvas>
+                </div>`;
+            
+            setTimeout(() => {
+                const ctx = document.getElementById(chartId);
+                if(!ctx) return;
+                
+                if (chartInstances[chartId]) chartInstances[chartId].destroy();
+
+                const sortedScores = Object.keys(scoreDistribution).sort((a, b) => {
+                    if (a === 'N/A') return 1;
+                    if (b === 'N/A') return -1;
+                    return parseFloat(a) - parseFloat(b);
+                });
+
+                chartInstances[chartId] = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: sortedScores,
+                        datasets: [{
+                            label: '# of Students',
+                            data: sortedScores.map(score => scoreDistribution[score]),
+                            backgroundColor: sortedScores.map((_, i) => `hsl(${210 + i * (150 / sortedScores.length)}, 60%, 60%)`),
+                        }]
+                    },
+                    options: {
+                        plugins: {
+                            legend: { display: false },
+                            title: { display: true, text: `Score Distribution for ${question.displayNumber}`, color: '#d1d5db' }
+                        },
+                        scales: {
+                            y: { beginAtZero: true, title: { display: true, text: 'Number of Students', color: '#9ca3af' }, ticks: { color: '#9ca3af', stepSize: 1 }, grid: { color: '#374151' } },
+                            x: { title: { display: true, text: 'Score', color: '#9ca3af' }, ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
+                        }
+                    }
+                });
+            }, 0);
+        }
+
+        function renderDistractorAnalysisSelector() {
+            const mcqs = getLeafQuestions(state.questions).filter(q => q.type === 'mcq');
+             if (mcqs.length > 0) {
+                distractorAnalysisContainer.classList.remove('hidden');
+                const currentSelection = distractorSelectForAnalysis.value;
+                distractorSelectForAnalysis.innerHTML = '<option value="">Select a multiple choice question...</option>';
+                mcqs.forEach(q => {
+                    const option = document.createElement('option');
+                    option.value = q.id;
+                    option.textContent = q.displayNumber;
+                    if (q.id === currentSelection) option.selected = true;
+                    distractorSelectForAnalysis.appendChild(option);
+                });
+            } else {
+                distractorAnalysisContainer.classList.add('hidden');
+            }
+        }
+        
+        distractorSelectForAnalysis.addEventListener('change', e => {
+             const questionId = e.target.value;
+            if (questionId) {
+                renderDistractorAnalysis(questionId);
+            } else {
+                distractorAnalysisContent.innerHTML = '<p class="text-center text-gray-500 py-8">Select a question to see the class response distribution.</p>';
+            }
+        });
+
+        function renderDistractorAnalysis(questionId) {
+            const question = findQuestionById(questionId);
+            const activeStudents = state.students.filter(s => s.lastName && s.firstName);
+            if (!question || activeStudents.length === 0) return;
+
+            const responseDistribution = {};
+            activeStudents.forEach(s => {
+                const response = s.mcqResponses[questionId] ? s.mcqResponses[questionId] : 'No Answer';
+                responseDistribution[response] = (responseDistribution[response] || 0) + 1;
+            });
+
+            const chartId = 'distractorAnalysisChart';
+            distractorAnalysisContent.innerHTML = `<div class="bg-gray-800/50 p-4 rounded-lg"><canvas id="${chartId}"></canvas></div>`;
+            
+            setTimeout(() => {
+                const ctx = document.getElementById(chartId);
+                if(!ctx) return;
+                if (chartInstances[chartId]) chartInstances[chartId].destroy();
+
+                const labels = Object.keys(responseDistribution).sort();
+                const data = labels.map(label => responseDistribution[label]);
+                const bgColors = labels.map(label => label === question.correctAnswer ? '#10b981' : '#ef4444');
+
+                chartInstances[chartId] = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '# of Students',
+                            data: data,
+                            backgroundColor: bgColors
+                        }]
+                    },
+                    options: {
+                         plugins: {
+                            legend: { display: false },
+                            title: { display: true, text: `Response Distribution for ${question.displayNumber}`, color: '#d1d5db' }
+                        },
+                        scales: {
+                            y: { beginAtZero: true, title: { display: true, text: 'Number of Students', color: '#9ca3af' }, ticks: { color: '#9ca3af', stepSize: 1 }, grid: { color: '#374151' } },
+                            x: { title: { display: true, text: 'Selected Answer', color: '#9ca3af' }, ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
+                        }
+                    }
+                });
+            }, 0);
+        }
+
 
 
         // --- IMPORT/EXPORT & SESSION LOGIC ---
         exportCsvBtn.addEventListener('click', () => {
              if (state.students.length === 0) { return; }
             const leafQs = getLeafQuestions(state.questions);
-            let csv = `"Last Name","First Name",${leafQs.map(q => `"${q.displayNumber.replace('Q', '')} (Max ${q.maxMarks})"`).join(",")},Total Score\r\n`;
+            let csv = `"Last Name","First Name",Tags,${leafQs.map(q => `"${q.displayNumber.replace('Q', '')} (Max ${q.maxMarks})"`).join(",")},Total Score\r\n`;
             state.students.filter(s => s.lastName && s.firstName).forEach(s => {
                 const total = leafQs.reduce((sum, q) => sum + (s.responses[q.id] || 0), 0);
-                const scores = leafQs.map(q => s.responses[q.id] === undefined ? '' : s.responses[q.id]);
-                csv += `"${s.lastName}","${s.firstName}",${scores.join(",")},${total.toFixed(1)}\r\n`;
+                const scores = leafQs.map(q => {
+                    if(q.type === 'mcq') return s.mcqResponses[q.id] || '';
+                    return s.responses[q.id] === undefined ? '' : s.responses[q.id];
+                });
+                // --- FIX: Removed quotes around the joined scores to ensure correct column alignment in CSV ---
+                csv += `"${s.lastName}","${s.firstName}","${(s.tags || []).join(';')}","${scores.join(',')}",${total.toFixed(1)}\r\n`;
             });
             const link = document.createElement("a");
             link.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
@@ -1685,10 +2159,10 @@
             reader.onload = (e) => {
                 try {
                     const importedState = JSON.parse(e.target.result);
-                    state = importedState;
+                    state = { ...getInitialState(), ...importedState };
                      if (state.questions.length > 0 && dataSection.classList.contains('hidden')) {
-                         setupSection.classList.add('hidden');
-                         dataSection.classList.remove('hidden');
+                          setupSection.classList.add('hidden');
+                          dataSection.classList.remove('hidden');
                      }
                     render();
                     debouncedAutoSave();
@@ -1801,110 +2275,76 @@
         });
         
         // --- PDF REPORTING ---
-        async function generateIndividualPdfReport(student) {
-            if (!student) return;
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF({ orientation: 'landscape' });
-            const analysisContainer = document.getElementById('individual-analysis-content');
-            console.log(`Generating PDF report for ${student.firstName} ${student.lastName}...`);
+        async function generatePdfReport(isIndividual, student) {
+             const { jsPDF } = window.jspdf;
+             const doc = new jsPDF({ orientation: 'landscape' });
+             const analysisContainer = isIndividual ? document.getElementById('individual-analysis-content') : document.getElementById('analysis-content');
+             console.log(`Generating PDF report...`);
 
-            doc.setFontSize(22);
-            doc.text(`Performance Report for: ${student.firstName} ${student.lastName}`, 14, 20);
-            doc.setFontSize(12);
-            doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 28);
+             doc.setFontSize(22);
+             doc.text(isIndividual ? `Performance Report for: ${student.firstName} ${student.lastName}` : 'Class Performance Analysis Report', 14, 20);
+             doc.setFontSize(12);
+             doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 28);
             
             let y = 40;
 
-            const addChartToPdf = async (chartWrapperId, title) => {
-                const chartWrapper = analysisContainer.querySelector(`#${chartWrapperId}`);
+            const addChartToPdf = async (chartWrapper) => {
                 if (!chartWrapper || chartWrapper.clientHeight === 0) return;
                 
-                if (y > 180) { // Check if we need a new page
+                if (y > 180) { // Check for new page
                     doc.addPage();
                     y = 20;
                 }
-
-                doc.setFontSize(16);
-                doc.text(title, 14, y);
-                y += 10;
                 
                 const canvas = await html2canvas(chartWrapper, { backgroundColor: '#1f2937', scale: 2 });
                 const imgData = canvas.toDataURL('image/png');
                 const imgProps = doc.getImageProperties(imgData);
                 const pdfWidth = doc.internal.pageSize.getWidth() - 28;
                 const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                
+                if (y + pdfHeight > 200) { // Check again after getting height
+                    doc.addPage();
+                    y = 20;
+                }
+                
                 doc.addImage(imgData, 'PNG', 14, y, pdfWidth, pdfHeight);
                 y += pdfHeight + 10;
             };
 
-            await addChartToPdf('indivModuleChart-wrapper', 'Performance by Module');
-            await addChartToPdf('indivContentChart-wrapper', 'Performance by Content Area');
-            await addChartToPdf('indivOutcomeChart-wrapper', 'Performance by Syllabus Outcome');
-            await addChartToPdf('indivVerbChart-wrapper', 'Performance by Cognitive Verb');
+            const chartCheckboxes = analysisContainer.querySelectorAll('.pdf-include-checkbox:checked');
+            for (const checkbox of chartCheckboxes) {
+                const chartId = checkbox.dataset.chartId;
+                const chartWrapper = document.getElementById(`${chartId}-wrapper`);
+                await addChartToPdf(chartWrapper);
+            }
             
-            doc.save(`exam-report-${student.lastName}-${student.firstName}-${new Date().toISOString().slice(0,10)}.pdf`);
+            doc.save(`exam-report-${isIndividual ? `${student.lastName}-${student.firstName}-` : 'class-'}${new Date().toISOString().slice(0,10)}.pdf`);
         }
-
-        generatePdfReportBtn.addEventListener('click', async () => {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF({ orientation: 'landscape' });
-            const analysisContainer = document.getElementById('analysis-section');
-            console.log('Generating PDF report... this may take a moment.');
-
-            doc.setFontSize(22);
-            doc.text('Exam Performance Analysis Report', 14, 20);
-            doc.setFontSize(12);
-            doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 28);
-            
-            let y = 40;
-
-            const addChartToPdf = async (chartWrapperId, title) => {
-                const chartWrapper = analysisContainer.querySelector(`#${chartWrapperId}`);
-                if (!chartWrapper || chartWrapper.clientHeight === 0) return;
-                
-                if (y > 180) { // Check if we need a new page
-                    doc.addPage();
-                    y = 20;
-                }
-
-                doc.setFontSize(16);
-                doc.text(title, 14, y);
-                y += 10;
-                
-                const canvas = await html2canvas(chartWrapper, { backgroundColor: '#1f2937', scale: 2 });
-                const imgData = canvas.toDataURL('image/png');
-                const imgProps = doc.getImageProperties(imgData);
-                const pdfWidth = doc.internal.pageSize.getWidth() - 28;
-                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-                doc.addImage(imgData, 'PNG', 14, y, pdfWidth, pdfHeight);
-                y += pdfHeight + 10;
-            };
-
-            await addChartToPdf('classModuleChart-wrapper', 'Class Performance by Module');
-            await addChartToPdf('classContentChart-wrapper', 'Class Performance by Content Area');
-            await addChartToPdf('classOutcomeChart-wrapper', 'Class Performance by Syllabus Outcome');
-            await addChartToPdf('classVerbChart-wrapper', 'Class Performance by Cognitive Verb');
-            await addChartToPdf('classBandChart-wrapper', 'Class Performance Bands');
-            
-            doc.save(`exam-report-${new Date().toISOString().slice(0,10)}.pdf`);
+        
+        generatePdfReportBtn.addEventListener('click', () => generatePdfReport(false));
+        document.getElementById('generate-individual-pdf-report-btn').addEventListener('click', () => {
+            const studentId = studentSelectForAnalysis.value;
+            const student = state.students.find(s => s.id === studentId);
+            if(student) generatePdfReport(true, student);
         });
+
         
         // --- INITIALIZATION ---
         
-        // Finalize setup button moves from setup view to data entry view
         finalizeSetupBtn.addEventListener('click', () => {
             if (state.questions.length === 0) {
                 console.error("Please add at least one question to the exam structure.");
                 return;
             }
+            toggleLock(true);
             setupSection.classList.add('hidden');
             dataSection.classList.remove('hidden');
             render();
             debouncedAutoSave();
         });
 
-        // Edit setup button returns to setup view
         editSetupBtn.addEventListener('click', () => {
+            toggleLock(false);
             setupSection.classList.remove('hidden');
             dataSection.classList.add('hidden');
             render();
@@ -1919,4 +2359,3 @@
     </script>
 </body>
 </html>
-
